@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "treelog"
+version = "0.0"
+description = "Tree based logging for async python"
+authors = [
+    { name = "Tanner Sims", email = "tannersims@hesitantlyhuman.com" }
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+]
+keywords = ["logging", "async", "tree", "ui"]
+
+[project.optional-dependencies]
+dev = ["pytest", "black"]
+ui = ["streamlit"]
+
+[project.urls]
+Homepage = "https://github.com/HesitantlyHuman/treelog"
+Repository = "https://github.com/HesitantlyHuman/treelog"
+
+[project.scripts]
+treelog-ui = "treelog:main_ui"
+
+[tool.hatch.envs.test.scripts]
+test = "pytest {args:tests}"
