@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Self
 from dataclasses import dataclass
 from enum import Enum
 
@@ -11,6 +11,13 @@ class MessageType(Enum):
     SYSTEM = "system"
     ERROR = "error"
     USER = "user"
+
+    @classmethod
+    def from_string(cls, input: str) -> Self | None:
+        try:
+            return cls(input.lower().strip())
+        except:
+            raise ValueError(f"'{input}' is not a valid MessageType!")
 
 
 @dataclass

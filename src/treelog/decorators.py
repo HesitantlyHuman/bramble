@@ -2,6 +2,7 @@ from treelog.logger import TreeLogger
 from treelog.logs import MessageType
 
 
+# TODO: add these to the branch wrapper in logger.py
 def tree_log_exceptions(func):
     async def wrapper(*args, **kwargs):
         # First, find if there are any tree loggers in the arguments
