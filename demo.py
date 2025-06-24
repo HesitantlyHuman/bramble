@@ -19,14 +19,14 @@ async def async_entry():
 async def async_a():
     await async_b()
 
-    await treelog.alog("Finished with async_b!", "USER", {"a": 1})
+    treelog.log("Finished with async_b!", "USER", {"a": 1})
 
     asyncio.gather(*[async_b(), async_c()])
 
 
 @treelog.branch
 async def async_b():
-    await treelog.alog("Started async_b", "ERROR")
+    treelog.log("Started async_b", "ERROR")
     await async_c()
     logging.debug("I am a debug message!")
 
@@ -34,13 +34,13 @@ async def async_b():
 # TODO: figure out a better name for the decorator
 @treelog.branch
 async def async_c():
-    await treelog.alog("First message")
+    treelog.log("First message")
 
     # Writing some stuff to a different file, should still write to the original as well
     logging_writer = treelog.FileTreeLoggingWriter("b")
     with treelog.TreeLogger("entry", logging_writer):
-        await treelog.alog("Second message")
-        await treelog.alog("Third message", entry_metadata={"id": "lkefidks"})
+        treelog.log("Second message")
+        treelog.log("Third message", entry_metadata={"id": "lkefidks"})
 
     sync_inside()
 
@@ -56,7 +56,7 @@ def sync_inside():
 
 logging_writer = treelog.FileTreeLoggingWriter("a")
 
-with treelog.TreeLogger("entry", logging_writer=logging_writer):
+with treelog.TreeLogger("entry", logging_backend=logging_writer):
     entry_function()
 
 # No logging

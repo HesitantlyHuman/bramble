@@ -5,17 +5,19 @@ import json
 import os
 
 from treelog.logs import LogEntry, TreeLog
-from treelog.utils import dispatch_async
 
 # TODO: maybe merge these?
+
+# TODO: update docstrings
 
 
 # TODO: Document the fact that you only need to implement either the sync or
 # async version of any of the backend methods.
 class TreeLoggingWriter:
+    # TODO: do we want to provide entries for multiple branches?
     def append_entry(
         self,
-        node_id: str,
+        branch_id: str,
         log_entry: LogEntry | List[LogEntry],
     ) -> None:
         """Append a log entry to the tree logger for a specific node.
@@ -24,11 +26,11 @@ class TreeLoggingWriter:
             node_id (Union[str, List[str]]): The ID of the tree logger.
             log_entry (LogEntry): The log entry to append.
         """
-        dispatch_async(self.async_append_entry, node_id=node_id, log_entry=log_entry)
+        raise NotImplementedError()
 
     async def async_append_entry(
         self,
-        node_id: str,
+        branch_id: str,
         log_entry: LogEntry | List[LogEntry],
     ) -> None:
         """Append a log entry to the tree logger for a specific node.
@@ -37,9 +39,9 @@ class TreeLoggingWriter:
             node_id (Union[str, List[str]]): The ID of the tree logger.
             log_entry (LogEntry): The log entry to append.
         """
-        self.append_entry(node_id=node_id, log_entry=log_entry)
+        self.append_entry(branch_id=branch_id, log_entry=log_entry)
 
-    def add_tags(self, logger_id: str, tags: str | List[str]) -> None:
+    def add_tags(self, branch_id: str, tags: str | List[str]) -> None:
         """Add tags to the tree logger.
 
         Does not remove existing tags. Does not add duplicate tags.
@@ -48,9 +50,9 @@ class TreeLoggingWriter:
             logger_id (str): The ID of the tree logger.
             tags (Union[str, List[str]]): The tags to add. Can be a single tag or a list.
         """
-        dispatch_async(self.async_add_tags, logger_id=logger_id, tags=tags)
+        raise NotImplementedError()
 
-    async def async_add_tags(self, logger_id: str, tags: str | List[str]) -> None:
+    async def async_add_tags(self, branch_id: str, tags: str | List[str]) -> None:
         """Add tags to the tree logger.
 
         Does not remove existing tags. Does not add duplicate tags.
@@ -59,9 +61,9 @@ class TreeLoggingWriter:
             logger_id (str): The ID of the tree logger.
             tags (Union[str, List[str]]): The tags to add. Can be a single tag or a list.
         """
-        self.add_tags(logger_id=logger_id, tags=tags)
+        self.add_tags(branch_id=branch_id, tags=tags)
 
-    def remove_tags(self, logger_id: str, tags: str | List[str]) -> None:
+    def remove_tags(self, branch_id: str, tags: str | List[str]) -> None:
         """Removes tags from the tree logger.
 
         If a tag does not exist, it is ignored.
@@ -70,9 +72,9 @@ class TreeLoggingWriter:
             logger_id (str): The ID of the tree logger.
             tags (Union[str, List[str]]): The tags to remove. Can be a single tag or a list.
         """
-        dispatch_async(self.async_remove_tags, logger_id=logger_id, tags=tags)
+        raise NotImplementedError()
 
-    async def async_remove_tags(self, logger_id: str, tags: str | List[str]) -> None:
+    async def async_remove_tags(self, branch_id: str, tags: str | List[str]) -> None:
         """Removes tags from the tree logger.
 
         If a tag does not exist, it is ignored.
@@ -81,24 +83,19 @@ class TreeLoggingWriter:
             logger_id (str): The ID of the tree logger.
             tags (Union[str, List[str]]): The tags to remove. Can be a single tag or a list.
         """
-        self.remove_tags(logger_id=logger_id, tags=tags)
+        self.remove_tags(branch_id=branch_id, tags=tags)
 
-    def update_logger_metadata(self, logger_id: str, metadata: Dict[str, Any]) -> None:
-        """Updates the metadata of a tree logger with an arbitrary dictionary.
+    # TODO: add docstrings
+    def update_tree(self, branch_id: str, parent: str, children: List[str]) -> None:
+        raise NotImplementedError()
 
-        Creates metadata if it does not exist. If the new metadata is a subset of the
-        existing metadata, only the keys provided in the new metadata will be updated.
+    async def async_update_tree(
+        self, branch_id: str, parent: str, children: List[str]
+    ) -> None:
+        self.update_tree(branch_id=branch_id, parent=parent, children=children)
 
-        Args:
-            logger_id (str): The ID of the tree logger.
-            metadata (Dict[str, Any]): The metadata to update.
-        """
-        dispatch_async(
-            self.async_update_logger_metadata, logger_id=logger_id, metadata=metadata
-        )
-
-    async def async_update_logger_metadata(
-        self, logger_id: str, metadata: Dict[str, Any]
+    def update_branch_metadata(
+        self, branch_id: str, metadata: Dict[str, str | int | float | bool]
     ) -> None:
         """Updates the metadata of a tree logger with an arbitrary dictionary.
 
@@ -109,7 +106,21 @@ class TreeLoggingWriter:
             logger_id (str): The ID of the tree logger.
             metadata (Dict[str, Any]): The metadata to update.
         """
-        self.update_logger_metadata(logger_id=logger_id, metadata=metadata)
+        raise NotImplementedError()
+
+    async def async_update_branch_metadata(
+        self, branch_id: str, metadata: Dict[str, Any]
+    ) -> None:
+        """Updates the metadata of a tree logger with an arbitrary dictionary.
+
+        Creates metadata if it does not exist. If the new metadata is a subset of the
+        existing metadata, only the keys provided in the new metadata will be updated.
+
+        Args:
+            logger_id (str): The ID of the tree logger.
+            metadata (Dict[str, Any]): The metadata to update.
+        """
+        self.update_logger_metadata(branch_id=branch_id, metadata=metadata)
 
 
 class TreeLoggingReader:
@@ -122,7 +133,7 @@ class TreeLoggingReader:
         Returns:
             Union[TreeLog, List[TreeLog]]: The log for the tree logger or tree loggers.
         """
-        return dispatch_async(self.async_get_logs, logger_id=logger_id)
+        raise NotImplementedError()
 
     async def async_get_logs(
         self, logger_id: str | List[str]
@@ -146,7 +157,7 @@ class TreeLoggingReader:
         Returns:
             List[str]: The IDs of tree loggers with the tag.
         """
-        return dispatch_async(self.async_get_logger_ids_by_tag, tag=tag)
+        raise NotImplementedError()
 
     async def async_get_logger_ids_by_tag(self, tag: str) -> List[str]:
         """Get the IDs of tree loggers with a specific tag.
@@ -165,7 +176,7 @@ class TreeLoggingReader:
         Returns:
             List[str]: The IDs of all tree loggers.
         """
-        return dispatch_async(self.async_get_logger_ids)
+        raise NotImplementedError()
 
     async def async_get_logger_ids(self) -> List[str]:
         """Get the IDs of all tree loggers.
@@ -184,7 +195,7 @@ class TreeLoggingReader:
         Returns:
             Dict[str, Any]: The metada for the logger.
         """
-        return dispatch_async(self.async_get_logger_metadata, id=id)
+        raise NotImplementedError()
 
     async def async_get_logger_metadata(self, id: str) -> Dict[str, Any]:
         """Gets metadata for a specific logger.
