@@ -1,15 +1,15 @@
 from typing import Any, Dict, List, Set
 
-import inspect
 import contextvars
+import threading
 import datetime
+import inspect
 import asyncio
+import queue
 import uuid
+import time
 
-from treelog.backend import (
-    TreeLoggingWriter,
-    TreeLoggingReader,
-)
+from treelog.backend import TreeLoggingWriter
 from treelog.logs import (
     MessageType,
     LogEntry,
@@ -30,44 +30,202 @@ class TreeLogger:
     """
 
     root: "LogBranch"
+    logging_backend: TreeLoggingWriter
+    silent: bool
 
     def __init__(
         self,
         name: str,
         logging_backend: TreeLoggingWriter,
-        debounce: float = 0.25,
+        debounce: float = 0.5,
         batch_size: int = 50,
+        silent: bool = False,
     ):
         self.logging_backend = logging_backend
+        self.silent = silent
 
-        self._log_tasks = []
+        self._tasks = queue.SimpleQueue()
+        self._debounce = debounce
+        self._batch_size = batch_size
 
         self.root = LogBranch(name=name, tree_logger=self)
 
-        # TODO: start logging process
+    def run(self):
+        async def _run():
+            log_tasks, tree_tasks, meta_tasks, tag_tasks = (
+                None,
+                None,
+                None,
+                None,
+            )
 
-    async def _run():
-        pass
+            deadline = None
+
+            def get_batch_size():
+                return max(
+                    [0]
+                    + [
+                        len(item)
+                        for item in [log_tasks, tree_tasks, meta_tasks, tag_tasks]
+                        if item is not None
+                    ]
+                )
+
+            while True:
+                if deadline:
+                    try:
+                        task = self._tasks.get(timeout=deadline - time.time())
+                    except queue.Empty:
+                        task = ()
+                else:
+                    task = self._tasks.get()
+                    deadline = time.time() + self._debounce
+
+                if task is not None and len(task) > 0:
+                    task_type = task[0]
+                    match task_type:
+                        case 0:
+                            _, branch_id, log_entry = task
+
+                            if not log_tasks:
+                                log_tasks = {}
+
+                            if not branch_id in log_tasks:
+                                log_tasks[branch_id] = []
+
+                            log_tasks[branch_id].append(log_entry)
+                        case 1:
+                            _, branch_id, parent, children = task
+
+                            if not tree_tasks:
+                                tree_tasks = {}
+
+                            tree_tasks[branch_id] = (parent, list(set(children)))
+                        case 2:
+                            _, branch_id, metadata = task
+
+                            if not meta_tasks:
+                                meta_tasks = {}
+
+                            if not branch_id in meta_tasks:
+                                meta_tasks[branch_id] = {}
+
+                            meta_tasks[branch_id].update(metadata)
+                        case 3:
+                            _, branch_id, tags = task
+
+                            if not tag_tasks:
+                                tag_tasks = {}
+
+                            if not branch_id in tag_tasks:
+                                tag_tasks[branch_id] = []
+
+                            task_tags = set(tag_tasks[branch_id])
+                            task_tags.update(tags)
+                            tag_tasks[branch_id] = list(task_tags)
+
+                if (
+                    time.time() > deadline
+                    or get_batch_size() >= self._batch_size
+                    or task is None
+                ):
+                    todo = []
+
+                    if log_tasks:
+                        todo.append(
+                            self.logging_backend.async_append_entries(
+                                entries=log_tasks,
+                            )
+                        )
+
+                    if tree_tasks:
+                        todo.append(
+                            self.logging_backend.async_update_tree(
+                                relationships=tree_tasks,
+                            )
+                        )
+
+                    if meta_tasks:
+                        todo.append(
+                            self.logging_backend.async_update_branch_metadata(
+                                metadata=meta_tasks,
+                            )
+                        )
+
+                    if tag_tasks:
+                        todo.append(
+                            self.logging_backend.async_add_tags(
+                                tags=tag_tasks,
+                            )
+                        )
+
+                    await asyncio.gather(*todo)
+
+                    log_tasks, tree_tasks, meta_tasks, tag_tasks = (
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+
+                    deadline = None
+
+                if task is None:
+                    return
+
+        try:
+            asyncio.run(_run())
+        except Exception as e:
+            # TODO: make this error easier to understand
+            if not self.silent:
+                raise e
 
     def log(
         self,
         branch_id: str,
         message: str,
         message_type: MessageType | str = MessageType.USER,
-        entry_metadata: Dict[str, str | int | float | bool] = None,
+        entry_metadata: Dict[str, str | int | float | bool] | None = None,
     ) -> None:
         """Log a message to the tree logger.
 
         Args:
             message (str): The message to log.
-            message_type (MessageType, optional): The type of the message. Defaults to
-                MessageType.USER. Generally, MessageType.SYSTEM is used for system
-                messages internal to the logging system.
-            entry_metadata (Dict[str, Union[str, int, float, bool]], optional): Metadata
-                to include with the log entry. Defaults to None.
+            message_type (MessageType, optional): The type of the message.
+                Defaults to MessageType.USER. Generally, MessageType.SYSTEM is
+                used for system messages internal to the logging system.
+            entry_metadata (Dict[str, Union[str, int, float, bool]], optional):
+                Metadata to include with the log entry. Defaults to None.
         """
+        if not isinstance(message, str):
+            raise ValueError(
+                f"`message` must be of type `str`, received {type(message)}."
+            )
+
         if isinstance(message_type, str):
             message_type = MessageType.from_string(message_type)
+        elif not isinstance(message_type, MessageType):
+            raise ValueError(
+                f"`message_type` must be of type `str` or `MessageType`, received {type(message_type)}."
+            )
+
+        if entry_metadata is not None and not isinstance(entry_metadata, dict):
+            raise ValueError(
+                f"`entry_metadata` must either be `None` or a dictionary, received {type(entry_metadata)}."
+            )
+
+        if entry_metadata is not None:
+            for key, value in entry_metadata.items():
+                if not isinstance(key, str):
+                    raise ValueError(
+                        f"Keys for `entry_metadata` must be of type `str`, received {type(key)}"
+                    )
+
+                if not isinstance(value, (str, int, float, bool)):
+                    raise ValueError(
+                        f"Values for `entry_metadata` must be one of `str`, `int`, `float`, `bool`, received {type(value)}"
+                    )
+
         timestamp = datetime.datetime.now().timestamp()
         log_entry = LogEntry(
             message=message,
@@ -75,18 +233,18 @@ class TreeLogger:
             message_type=message_type,
             entry_metadata=entry_metadata,
         )
-        self._log_tasks.append((branch_id, log_entry))
+        self._tasks.put((0, branch_id, log_entry))
 
     def update_tree(self, branch_id: str, parent: str, children: List[str]) -> None:
-        raise NotImplementedError()
+        self._tasks.put((1, branch_id, parent, children))
 
     def update_metadata(
         self, branch_id: str, metadata: Dict[str, str | int | float | bool]
     ) -> None:
-        raise NotImplementedError()
+        self._tasks.put((2, branch_id, metadata))
 
     def update_tags(self, branch_id: str, tags: List[str]) -> None:
-        raise NotImplementedError()
+        self._tasks.put((3, branch_id, tags))
 
     def __enter__(self):
         current_logger_ids = _CURRENT_BRANCH_IDS.get()
@@ -98,6 +256,9 @@ class TreeLogger:
             _CURRENT_BRANCH_IDS.set(current_logger_ids)
 
         _LIVE_BRANCHES[self.root.id] = self.root
+
+        self._logging_thread = threading.Thread(target=self.run)
+        self._logging_thread.start()
 
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type:
@@ -128,16 +289,20 @@ class TreeLogger:
             except KeyError:
                 pass
 
+        # Stop the logging thread
+        self._tasks.put(None)
+        self._logging_thread.join()
+
 
 # TODO: add support to putting tags on branches via the decorator
 # TODO: Add support for putting metadata on branches via the decorator
 # TODO: Add support for logging function calls, returns and exceptions
-def branch(func):
-    def wrapper(*args, **kwargs):
+def _async_branch(func):
+    async def wrapper(*args, **kwargs):
         current_logger_ids = _CURRENT_BRANCH_IDS.get()
 
         if len(current_logger_ids) == 0:
-            func(*args, **kwargs)
+            return await func(*args, **kwargs)
 
         new_logger_ids = set()
         for logger_id in current_logger_ids:
@@ -147,33 +312,68 @@ def branch(func):
             new_logger_ids.add(new_logger.id)
         _CURRENT_BRANCH_IDS.set(new_logger_ids)
 
-        func(*args, **kwargs)
+        output = await func(*args, **kwargs)
 
         _CURRENT_BRANCH_IDS.set(current_logger_ids)
 
+        return output
+
     return wrapper
+
+
+def _sync_branch(func):
+    def wrapper(*args, **kwargs):
+        current_logger_ids = _CURRENT_BRANCH_IDS.get()
+
+        if len(current_logger_ids) == 0:
+            return func(*args, **kwargs)
+
+        new_logger_ids = set()
+        for logger_id in current_logger_ids:
+            old_logger = _LIVE_BRANCHES[logger_id]
+            new_logger = old_logger.branch(name=func.__name__)
+            _LIVE_BRANCHES[new_logger.id] = new_logger
+            new_logger_ids.add(new_logger.id)
+        _CURRENT_BRANCH_IDS.set(new_logger_ids)
+
+        output = func(*args, **kwargs)
+
+        _CURRENT_BRANCH_IDS.set(current_logger_ids)
+
+        return output
+
+    return wrapper
+
+
+def branch(func):
+    if inspect.iscoroutinefunction(func):
+        return _async_branch(func)
+    else:
+        return _sync_branch(func)
 
 
 class LogBranch:
     id: str
     name: str
-    parent: str
+    parent: str | None
     children: List[str]
     tags: List[str]
     metadata: Dict[str, str | int | float | bool]
 
     def __init__(self, name: str, tree_logger: TreeLogger, id: str = None):
         self.name = name
+        self.parent = None
         self.children = []
-        self.parents = []
         self.tags = []
-        self.metadata = {}
+        self.metadata = {"name": name}
 
         self.tree_logger = tree_logger
 
         if id is None:
             id = str(uuid.uuid4().hex)[:24]
         self.id = id
+
+        self.tree_logger.update_metadata(self.id, self.metadata)
 
     def log(
         self,
@@ -245,21 +445,6 @@ class LogBranch:
         self.metadata.update(metadata)
         self.tree_logger.update_metadata(self.id, self.metadata)
 
-    # TODO: fix
-    @classmethod
-    def from_logging_storage(
-        cls,
-        id: str,
-        logging_writer: TreeLoggingWriter,
-        logging_reader: TreeLoggingReader,
-    ) -> "LogBranch":
-        metadata = logging_reader.get_logger_metadata(id)
-        new_logger = LogBranch(name=metadata["name"], logging_writer=logging_writer)
-        new_logger.id = id
-        new_logger.children = metadata["children"]
-        new_logger.parents = metadata["parents"]
-        return new_logger
-
 
 def log(
     message: str,
@@ -274,4 +459,14 @@ def log(
         branch = _LIVE_BRANCHES[branch_id]
         branch.log(
             message=message, message_type=message_type, entry_metadata=entry_metadata
+        )
+
+
+if __name__ == "__main__":
+    logging_backend = TreeLoggingWriter()
+    with TreeLogger("entry", logging_backend=logging_backend):
+        log(
+            "some message",
+            MessageType.USER,
+            {"key": "metadata"},
         )

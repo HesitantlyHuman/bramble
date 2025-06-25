@@ -39,8 +39,8 @@ class LogEntry:
 
 
 @dataclass
-class TreeLog:
-    """A tree logger's full info."""
+class BranchData:
+    """A tree logger branch's full info."""
 
     id: str
     messages: List[LogEntry]
