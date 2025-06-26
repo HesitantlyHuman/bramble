@@ -5,12 +5,12 @@ import asyncio
 import json
 import os
 
-from treelog.backend import TreeLoggingWriter, TreeLoggingReader
+from treelog.backend import TreeLogWriter, TreeLogReader
 from treelog.logs import LogEntry, BranchData
 
 
 # TODO: fix that this overwrites existing files
-class FileTreeLoggingWriter(TreeLoggingWriter):
+class FileWriter(TreeLogWriter):
     _partition: Dict[str, int]
     _data: Dict[int, Dict[str, Any]]
     _open_partitions: List[int]
@@ -135,7 +135,7 @@ class FileTreeLoggingWriter(TreeLoggingWriter):
             await f.write(data_to_write)
 
 
-class FileTreeLoggingReader(TreeLoggingReader):
+class FileReader(TreeLogReader):
     _data: Dict[str, BranchData]
     _with_tags: Dict[str, List[str]]
 
@@ -205,175 +205,3 @@ class FileTreeLoggingReader(TreeLoggingReader):
             await self.load_data()
             self._has_data = True
         return list(self._data.keys())
-
-
-# class FileLoggingStorage(LoggingStorage):
-#     data: Dict[str, Any]
-
-#     def __init__(self, base_path: str, num_partitions: int = 16):
-#         self.base_path = base_path
-#         self.file_path_format = os.path.join(base_path, FILE_NAME)
-#         os.makedirs(base_path, exist_ok=True)
-#         self.num_partitions = num_partitions
-#         self.data = {}
-#         self.load()
-#         self.save()
-
-#     def load(self):
-#         for i in range(self.num_partitions):
-#             self.data[i] = {}
-
-#         if os.path.exists(self.base_path):
-#             for i in range(self.num_partitions):
-#                 file_path = self.file_path_format.format(i)
-#                 if os.path.exists(file_path):
-#                     with open(file_path, "r") as f:
-#                         for line in f.readlines():
-#                             data = json.loads(line)
-#                             partition = self.hash_id(data["id"])
-#                             self.data[partition][data["id"]] = data
-
-#     def save(self):
-#         for i in range(self.num_partitions):
-#             self.write_partition(i)
-
-#     async def append_message(self, log_id: str, message: str, timestamp: float = None):
-#         partition = self.hash_id(log_id)
-#         if log_id not in self.data[partition]:
-#             self.data[partition][log_id] = {"messages": [], "metadata": {}}
-#         self.data[partition][log_id]["messages"].append(
-#             {"content": message, "timestamp": timestamp}
-#         )
-#         await self.async_write_partition(partition)
-
-#     async def update_metadata(self, log_id: str, metadata: Dict[str, Any]):
-#         partition = self.hash_id(log_id)
-#         if log_id not in self.data[partition]:
-#             self.data[partition][log_id] = {"messages": [], "metadata": {}}
-#         self.data[partition][log_id]["metadata"].update(metadata)
-#         await self.async_write_partition(partition)
-
-#     async def get_messages(self, log_id: str) -> List[Dict[str, Any]]:
-#         partition = self.hash_id(log_id)
-#         return self.data[partition][log_id]["messages"]
-
-#     async def get_metadata(self, log_id: str) -> Dict[str, Any]:
-#         partition = self.hash_id(log_id)
-#         return self.data[partition][log_id]["metadata"]
-
-#     async def get_flow_log(self, log_id: str) -> Dict[str, Any]:
-#         partition = self.hash_id(log_id)
-#         return self.data[partition][log_id]
-
-#     def hash_id(self, id: str) -> int:
-#         id_bytes = id.encode("utf-8")
-#         return int.from_bytes(id_bytes, "big") % self.num_partitions
-
-#     def stringify_partition(self, partition: int) -> str:
-#         string = ""
-#         for id, data in self.data[partition].items():
-#             data_with_id = data.copy()
-#             data_with_id["id"] = id
-#             string += json.dumps(data_with_id) + "\n"
-#         return string
-
-#     async def async_write_partition(self, partition: int):
-#         file_path = self.file_path_format.format(partition)
-#         str_data = self.stringify_partition(partition)
-#         async with aiofiles.open(file_path, "w") as f:
-#             await f.write(str_data)
-
-#     def write_partition(self, partition: int):
-#         file_path = self.file_path_format.format(partition)
-#         str_data = self.stringify_partition(partition)
-#         with open(file_path, "w") as f:
-#             f.write(str_data)
-
-#     async def write_to_redis(self, redis_connection: aioredis.Redis):
-#         redis_storage = RedisLoggingStorage(redis_connection)
-#         transfer_jobs = []
-#         for partition in range(self.num_partitions):
-#             for log_id in self.data[partition].keys():
-#                 transfer_jobs.append(
-#                     transfer_file_log_to_redis(log_id, self, redis_storage)
-#                 )
-#         await asyncio.gather(*transfer_jobs)
-
-
-# REDIS_PREFIX = "powergrader_ai:logging:"
-
-
-# class RedisLoggingStorage(LoggingStorage):
-#     def __init__(self, redis_connection: aioredis.Redis):
-#         self.redis_connection = redis_connection
-
-#     async def append_message(self, log_id: str, message: str, timestamp: float = None):
-#         stringified_message = json.dumps(
-#             {
-#                 "content": message,
-#                 "timestamp": timestamp,
-#             }
-#         )
-#         await self.redis_connection.rpush(REDIS_PREFIX + log_id, stringified_message)
-
-#     async def update_metadata(self, log_id: str, metadata: Dict[str, Any]):
-#         stringified_metadata = json.dumps(metadata)
-#         await self.redis_connection.set(
-#             REDIS_PREFIX + log_id + "_metadata", stringified_metadata
-#         )
-
-#     async def get_messages(self, log_id: str) -> List[Dict[str, Any]]:
-#         stringified_messages = await self.redis_connection.lrange(
-#             REDIS_PREFIX + log_id, 0, -1
-#         )
-#         return [json.loads(message) for message in stringified_messages]
-
-#     async def get_metadata(self, log_id: str) -> Dict[str, Any]:
-#         stringified_metadata = await self.redis_connection.get(
-#             REDIS_PREFIX + log_id + "_metadata"
-#         )
-#         return json.loads(stringified_metadata)
-
-#     async def get_flow_log(self, log_id: str) -> Dict[str, Any]:
-#         return {
-#             "messages": await self.get_messages(log_id),
-#             "metadata": await self.get_metadata(log_id),
-#         }
-
-#     @classmethod
-#     def from_connection_info(cls, host: str, port: str) -> "RedisLoggingStorage":
-#         redis_url = f"redis://{host}:{port}"
-#         pool = aioredis.BlockingConnectionPool().from_url(
-#             redis_url, max_connections=100
-#         )
-#         redis_connection = aioredis.Redis(connection_pool=pool)
-#         return cls(redis_connection)
-
-#     async def write_to_file(self, file_path: str):
-#         file_storage = FileLoggingStorage(file_path)
-#         transfer_jobs = []
-#         for log_id in self.redis_connection.keys(REDIS_PREFIX + "*"):
-#             transfer_jobs.append(transfer_redis_log_to_file(log_id, self, file_storage))
-#         await asyncio.gather(*transfer_jobs)
-
-
-# async def transfer_redis_log_to_file(
-#     log_id: str, redis_storage: RedisLoggingStorage, file_storage: FileLoggingStorage
-# ):
-#     flow_log = await redis_storage.get_flow_log(log_id)
-#     await file_storage.update_metadata(log_id, flow_log["metadata"])
-#     for message in flow_log["messages"]:
-#         await file_storage.append_message(
-#             log_id, message["content"], message["timestamp"]
-#         )
-
-
-# async def transfer_file_log_to_redis(
-#     log_id: str, file_storage: FileLoggingStorage, redis_storage: RedisLoggingStorage
-# ):
-#     flow_log = await file_storage.get_flow_log(log_id)
-#     await redis_storage.update_metadata(log_id, flow_log["metadata"])
-#     for message in flow_log["messages"]:
-#         await redis_storage.append_message(
-#             log_id, message["content"], message["timestamp"]
-#         )

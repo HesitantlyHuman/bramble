@@ -9,7 +9,7 @@ import queue
 import uuid
 import time
 
-from treelog.backend import TreeLoggingWriter
+from treelog.backend import TreeLogWriter
 from treelog.logs import (
     MessageType,
     LogEntry,
@@ -30,14 +30,14 @@ class TreeLogger:
     """
 
     root: "LogBranch"
-    logging_backend: TreeLoggingWriter
+    logging_backend: TreeLogWriter
     silent: bool
 
     def __init__(
         self,
         name: str,
-        logging_backend: TreeLoggingWriter,
-        debounce: float = 0.5,
+        logging_backend: TreeLogWriter,
+        debounce: float = 0.25,
         batch_size: int = 50,
         silent: bool = False,
     ):

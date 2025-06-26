@@ -55,7 +55,7 @@ def sync_inside():
     treelog.log("I am a sync message here inside async things")
 
 
-logging_writer = treelog.backends.FileTreeLoggingWriter("a")
+logging_writer = treelog.backends.RedisWriter.from_socket("127.0.0.1", "6379")
 
 with treelog.TreeLogger("entry", logging_backend=logging_writer):
     entry_function()

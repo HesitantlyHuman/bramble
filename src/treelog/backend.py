@@ -10,7 +10,7 @@ from treelog.logs import LogEntry, BranchData
 
 # TODO: Document the fact that you only need to implement either the sync or
 # async version of any of the backend methods.
-class TreeLoggingWriter:
+class TreeLogWriter:
     def append_entries(
         self,
         entries: Dict[str, List[LogEntry]],
@@ -128,7 +128,7 @@ class TreeLoggingWriter:
         self.update_branch_metadata(metadata=metadata)
 
 
-class TreeLoggingReader:
+class TreeLogReader:
     def get_logs(self, logger_id: str | List[str]) -> BranchData | List[BranchData]:
         """Get the log for a tree logger.
 

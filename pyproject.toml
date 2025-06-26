@@ -17,6 +17,7 @@ dependencies = [
 keywords = ["logging", "async", "tree", "ui"]
 
 [project.optional-dependencies]
+redis = ["redis>=4.2.0rc1", "msgpack"]
 dev = ["pytest", "black"]
 ui = ["streamlit"]
 
