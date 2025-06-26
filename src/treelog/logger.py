@@ -1,23 +1,18 @@
 from typing import Any, Dict, List, Set
 
-import contextvars
 import threading
 import datetime
-import inspect
 import asyncio
 import queue
 import uuid
 import time
 
+from treelog.context import _LIVE_BRANCHES, _CURRENT_BRANCH_IDS
 from treelog.backend import TreeLogWriter
+from treelog.compat import hook_logging
 from treelog.logs import (
     MessageType,
     LogEntry,
-)
-
-_LIVE_BRANCHES: Dict[str, "LogBranch"] = {}
-_CURRENT_BRANCH_IDS: contextvars.ContextVar[Set[str] | None] = contextvars.ContextVar(
-    "_CURRENT_BRANCH_IDS", default=set()
 )
 
 
@@ -49,6 +44,7 @@ class TreeLogger:
         self._batch_size = batch_size
 
         self.root = LogBranch(name=name, tree_logger=self)
+        hook_logging()
 
     def run(self):
         async def _run():

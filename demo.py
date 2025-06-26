@@ -1,8 +1,11 @@
 import asyncio
 import logging
-
 import treelog
 import treelog.backends
+
+# TODO: we should respect the set logging level somehow
+# currently we override it, so that we can get all of the info
+logging.basicConfig(level=logging.WARN)
 
 
 def entry_function():
@@ -22,6 +25,8 @@ async def async_a():
 
     treelog.log("Finished with async_b!", "USER", {"a": 1})
 
+    logging.info("Another test")
+
     await asyncio.gather(*[async_b(), async_c()])
 
 
@@ -32,7 +37,6 @@ async def async_b():
     logging.debug("I am a debug message!")
 
 
-# TODO: figure out a better name for the decorator
 @treelog.branch
 async def async_c():
     treelog.log("First message")
@@ -45,6 +49,8 @@ async def async_c():
 
     sync_inside()
 
+    logging.info("EVEN MORE")
+
     print("I am printin some stuff man!")
 
     # raise ValueError("Some random ass error")
@@ -53,6 +59,7 @@ async def async_c():
 @treelog.branch
 def sync_inside():
     treelog.log("I am a sync message here inside async things")
+    logging.debug("You should really fix this")
 
 
 logging_writer = treelog.backends.RedisWriter.from_socket("127.0.0.1", "6379")

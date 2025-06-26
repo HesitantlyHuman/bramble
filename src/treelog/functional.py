@@ -2,14 +2,12 @@ from typing import Dict, List
 
 import inspect
 
-from treelog.logger import TreeLogger, _CURRENT_BRANCH_IDS, _LIVE_BRANCHES
+from treelog.context import _CURRENT_BRANCH_IDS, _LIVE_BRANCHES
+from treelog.utils import stringify_function_call
 from treelog.logs import MessageType
 
 
-# TODO: add support to putting tags on branches via the decorator
-# TODO: Add support for putting metadata on branches via the decorator
-# TODO: Add support for logging function calls, returns and exceptions
-def _async_branch(func, tags=None, metadata=None):
+def _async_branch(func, name, tags=None, metadata=None):
     async def wrapper(*args, **kwargs):
         current_logger_ids = _CURRENT_BRANCH_IDS.get()
 
@@ -19,7 +17,7 @@ def _async_branch(func, tags=None, metadata=None):
         new_logger_ids = set()
         for logger_id in current_logger_ids:
             old_logger = _LIVE_BRANCHES[logger_id]
-            new_logger = old_logger.branch(name=func.__name__)
+            new_logger = old_logger.branch(name=name)
 
             if tags is not None:
                 new_logger.add_tags(tags)
@@ -40,7 +38,7 @@ def _async_branch(func, tags=None, metadata=None):
     return wrapper
 
 
-def _sync_branch(func, tags=None, metadata=None):
+def _sync_branch(func, name, tags=None, metadata=None):
     def wrapper(*args, **kwargs):
         current_logger_ids = _CURRENT_BRANCH_IDS.get()
 
@@ -50,7 +48,7 @@ def _sync_branch(func, tags=None, metadata=None):
         new_logger_ids = set()
         for logger_id in current_logger_ids:
             old_logger = _LIVE_BRANCHES[logger_id]
-            new_logger = old_logger.branch(name=func.__name__)
+            new_logger = old_logger.branch(name=name)
 
             if tags is not None:
                 new_logger.add_tags(tags)
@@ -65,6 +63,68 @@ def _sync_branch(func, tags=None, metadata=None):
         output = func(*args, **kwargs)
 
         _CURRENT_BRANCH_IDS.set(current_logger_ids)
+
+        return output
+
+    return wrapper
+
+
+def _async_tree_log_exceptions(func):
+    async def wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            log(e, MessageType.ERROR)
+            raise e
+
+    return wrapper
+
+
+def _sync_tree_log_exceptions(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            log(e, MessageType.ERROR)
+            raise e
+
+    return wrapper
+
+
+def _async_tree_log_args(func):
+    async def wrapper(*args, **kwargs):
+        log(
+            "Function call:\n" + stringify_function_call(func, args, kwargs),
+            MessageType.SYSTEM,
+        )
+
+        output = await func(*args, **kwargs)
+
+        try:
+            return_string = f"Function return:\n{output}"
+        except Exception:
+            return_string = "Function return:\n`ERROR`"
+        log(return_string, MessageType.SYSTEM)
+
+        return output
+
+    return wrapper
+
+
+def _sync_tree_log_args(func):
+    def wrapper(*args, **kwargs):
+        log(
+            "Function call:\n" + stringify_function_call(func, args, kwargs),
+            MessageType.SYSTEM,
+        )
+
+        output = func(*args, **kwargs)
+
+        try:
+            return_string = f"Function return:\n{output}"
+        except Exception:
+            return_string = "Function return:\n`ERROR`"
+        log(return_string, MessageType.SYSTEM)
 
         return output
 
@@ -98,9 +158,23 @@ def branch(
 
     def _branch(func):
         if inspect.iscoroutinefunction(func):
-            return _async_branch(func, tags=tags, metadata=metadata)
+            return _async_tree_log_exceptions(
+                _async_branch(
+                    _async_tree_log_args(func),
+                    func.__name__,
+                    tags=tags,
+                    metadata=metadata,
+                )
+            )
         else:
-            return _sync_branch(func, tags=tags, metadata=metadata)
+            return _sync_tree_log_exceptions(
+                _sync_branch(
+                    _sync_tree_log_args(func),
+                    func.__name__,
+                    tags=tags,
+                    metadata=metadata,
+                )
+            )
 
     if _func is None:
         return _branch
@@ -122,66 +196,3 @@ def log(
         branch.log(
             message=message, message_type=message_type, entry_metadata=entry_metadata
         )
-
-
-################################################################################
-
-
-# TODO: add these to the branch wrapper in logger.py
-def tree_log_exceptions(func):
-    async def wrapper(*args, **kwargs):
-        # First, find if there are any tree loggers in the arguments
-        # or keyword arguments
-        tree_loggers = [arg for arg in args if isinstance(arg, TreeLogger)] + [
-            kwarg for kwarg in kwargs.values() if isinstance(kwarg, TreeLogger)
-        ]
-        # If there are no tree loggers, just run the function
-        if not tree_loggers:
-            return await func(*args, **kwargs)
-        # Otherwise, run the function and log any exceptions
-        else:
-            try:
-                return await func(*args, **kwargs)
-            except Exception as e:
-                for logger in tree_loggers:
-                    await logger.log(str(e), MessageType.ERROR)
-                raise e
-
-    return wrapper
-
-
-def tree_log_function_arguments_and_returns(func):
-    async def wrapper(*args, **kwargs):
-        # First, find if there are any tree loggers in the arguments
-        # or keyword arguments
-        tree_loggers = [arg for arg in args if isinstance(arg, TreeLogger)] + [
-            kwarg for kwarg in kwargs.values() if isinstance(kwarg, TreeLogger)
-        ]
-        # If there are no tree loggers, just run the function
-        if not tree_loggers:
-            return await func(*args, **kwargs)
-        # Otherwise, run the function and log the arguments and returns
-        else:
-            # Now format the args and kwargs like they are a function call
-            function_call = f"{func.__name__}("
-            for arg in args:
-                function_call += f"{arg},\n"
-            for key, value in kwargs.items():
-                function_call += f"{key}={value},\n"
-            function_call += ")"
-
-            for logger in tree_loggers:
-                await logger.log(f"Function call: {function_call}", MessageType.SYSTEM)
-
-            result = await func(*args, **kwargs)
-
-            for logger in tree_loggers:
-                await logger.log(f"Function return: {result}", MessageType.SYSTEM)
-
-            return result
-
-    return wrapper
-
-
-def tree_log(func):
-    return tree_log_exceptions(tree_log_function_arguments_and_returns(func))
