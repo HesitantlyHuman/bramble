@@ -9,7 +9,7 @@ import time
 
 from treelog.context import _LIVE_BRANCHES, _CURRENT_BRANCH_IDS
 from treelog.backend import TreeLogWriter
-from treelog.compat import hook_logging
+from treelog.stdlib import hook_logging
 from treelog.logs import (
     MessageType,
     LogEntry,
