@@ -16,7 +16,7 @@ async def async_entry():
     await asyncio.gather(*[async_a(), async_b(), async_b(), async_b()])
 
 
-@treelog.branch
+@treelog.branch(tags=["b"])
 async def async_a():
     await async_b()
 
@@ -25,7 +25,7 @@ async def async_a():
     await asyncio.gather(*[async_b(), async_c()])
 
 
-@treelog.branch
+@treelog.branch(metadata={"a": 1})
 async def async_b():
     treelog.log("Started async_b", "ERROR")
     await async_c()

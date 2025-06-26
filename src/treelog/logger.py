@@ -294,64 +294,6 @@ class TreeLogger:
         self._logging_thread.join()
 
 
-# TODO: add support to putting tags on branches via the decorator
-# TODO: Add support for putting metadata on branches via the decorator
-# TODO: Add support for logging function calls, returns and exceptions
-def _async_branch(func):
-    async def wrapper(*args, **kwargs):
-        current_logger_ids = _CURRENT_BRANCH_IDS.get()
-
-        if len(current_logger_ids) == 0:
-            return await func(*args, **kwargs)
-
-        new_logger_ids = set()
-        for logger_id in current_logger_ids:
-            old_logger = _LIVE_BRANCHES[logger_id]
-            new_logger = old_logger.branch(name=func.__name__)
-            _LIVE_BRANCHES[new_logger.id] = new_logger
-            new_logger_ids.add(new_logger.id)
-        _CURRENT_BRANCH_IDS.set(new_logger_ids)
-
-        output = await func(*args, **kwargs)
-
-        _CURRENT_BRANCH_IDS.set(current_logger_ids)
-
-        return output
-
-    return wrapper
-
-
-def _sync_branch(func):
-    def wrapper(*args, **kwargs):
-        current_logger_ids = _CURRENT_BRANCH_IDS.get()
-
-        if len(current_logger_ids) == 0:
-            return func(*args, **kwargs)
-
-        new_logger_ids = set()
-        for logger_id in current_logger_ids:
-            old_logger = _LIVE_BRANCHES[logger_id]
-            new_logger = old_logger.branch(name=func.__name__)
-            _LIVE_BRANCHES[new_logger.id] = new_logger
-            new_logger_ids.add(new_logger.id)
-        _CURRENT_BRANCH_IDS.set(new_logger_ids)
-
-        output = func(*args, **kwargs)
-
-        _CURRENT_BRANCH_IDS.set(current_logger_ids)
-
-        return output
-
-    return wrapper
-
-
-def branch(func):
-    if inspect.iscoroutinefunction(func):
-        return _async_branch(func)
-    else:
-        return _sync_branch(func)
-
-
 class LogBranch:
     id: str
     name: str
@@ -444,22 +386,6 @@ class LogBranch:
     def add_metadata(self, metadata: Dict[str, str | int | float | bool]) -> None:
         self.metadata.update(metadata)
         self.tree_logger.update_metadata(self.id, self.metadata)
-
-
-def log(
-    message: str,
-    message_type: MessageType | str = MessageType.USER,
-    entry_metadata: Dict[str, str | int | float | bool] | None = None,
-):
-    current_branch_ids = _CURRENT_BRANCH_IDS.get()
-    if current_branch_ids is None:
-        return
-
-    for branch_id in current_branch_ids:
-        branch = _LIVE_BRANCHES[branch_id]
-        branch.log(
-            message=message, message_type=message_type, entry_metadata=entry_metadata
-        )
 
 
 if __name__ == "__main__":

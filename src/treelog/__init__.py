@@ -1,2 +1,3 @@
-from treelog.logger import TreeLogger, branch, log
+from treelog.logger import TreeLogger
 from treelog.logs import MessageType, LogEntry
+from treelog.functional import branch, log
