@@ -256,6 +256,8 @@ class TreeLogger:
         self._logging_thread = threading.Thread(target=self.run)
         self._logging_thread.start()
 
+        return self
+
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type:
             # TODO: log the exception

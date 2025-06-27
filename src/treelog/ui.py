@@ -1,35 +1,111 @@
 import streamlit as st
 
+st.set_page_config(page_title="Page Title", layout="wide")
+
+st.markdown(
+    """
+    <style>
+        .reportview-container {
+            margin-top: -2em;
+        }
+        #MainMenu {visibility: hidden;}
+        .stAppDeployButton {display:none;}
+        footer {visibility: hidden;}
+        #stDecoration {display:none;}
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
 log_name = "generate_initial_summaries"
 log_metadata = {
-    "id": "129124,124ks09asdj2092jads",
+    "id": "d322545fa7754d7f86cb8960",
     "num": 11,
     "start": "11-28 17:08:06",
     "end": "11-28 17:10:32",
     "duration": "0d 0h 2m 26s",
 }
 
+copy_style = """
+<style>
+    [class*="st-key-child-button"] button {
+        height: 30px;
+        min-height: 0;
+    }
+
+    .st-key-parent-button button {
+        height: 30px;
+        min-height: 0;
+    }
+
+    [class*="st-key-copy-button"] button {
+        width: 25px !important;
+        height: 25px !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        border-radius: 0.3rem !important;
+    }
+
+    .st-emotion-cache-gsx7k2 {
+        gap: 0.5rem;
+    }
+
+    .st-emotion-cache-ajtf3x {
+        gap: 0.5rem;
+    }
+</style>
+"""
+st.write(copy_style, unsafe_allow_html=True)
+
+
+copy_id = 0
+
 
 def copy_button(text_to_copy: str):
+    global copy_id
+
     def _copy():
         print(f"copy {text_to_copy}")
 
-    st.button("⧉", on_click=_copy)
+    st.button("⧉", on_click=_copy, key=f"copy-button-{copy_id}")
+    copy_id += 1
 
 
-st.title("Tree Logs")
-with st.container(border=True):
-    st.write("Current Log:")
-    st.write(log_name)
-with st.container(border=True):
-    st.write("Log ID:")
-    st.write(log_metadata["id"])
-    copy_button(log_metadata["id"])
-with st.container(border=True):
-    st.write("Parent:")
-    st.button("Parent")
-with st.container(border=True, height=200):
-    st.write("Children:")
-    for i in range(10):
-        st.button(f"Button {i}")
+def data_row(label: str, data: str, copiable: bool = True):
+    label_col, data_col, button_col = st.columns([0.25, 0.66, 0.07])
+    with label_col:
+        st.write(label)
+    with data_col:
+        st.markdown(f"`{data}`")
+    if copiable:
+        with button_col:
+            copy_button(data)
+
+
+st.title("Logs")
+col_1, col_2 = st.columns([0.6, 0.4], vertical_alignment="top")
+with col_1:
+    with st.container(border=True):
+        label_col, data_col = st.columns([0.25, 0.75])
+        with label_col:
+            st.write("Current Log:")
+        with data_col:
+            st.write(f"`{log_name}`")
+    with st.container(border=True):
+        data_row("Log ID:", log_metadata["id"])
+        data_row("Num entries:", log_metadata["num"], copiable=False)
+        data_row("Duration", log_metadata["duration"], copiable=False)
+        data_row("Start:", log_metadata["start"])
+        data_row("End:", log_metadata["end"])
+with col_2:
+    with st.container(border=True):
+        st.write("Parent:")
+        st.button("`Parent`", use_container_width=True, key="parent-button")
+    with st.container(border=True):
+        st.write("Children:")
+        with st.container(border=False, height=88):
+            for i in range(10):
+                st.button(
+                    f"`Button {i}`", use_container_width=True, key=f"child-button-{i}"
+                )
 st.dataframe()
