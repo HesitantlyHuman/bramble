@@ -7,7 +7,6 @@ import pandas as pd
 
 from treelog.logs import LogEntry, MessageType
 
-# TODO: where do we display the tags for this branch?
 
 log_name = "generate_initial_summaries"
 log_metadata = {
@@ -54,6 +53,12 @@ logs = [
         message_type=MessageType.USER,
         entry_metadata=None,
     ),
+    LogEntry(
+        message="what about when the line is long enough that it ends up hitting the edge of the message column and may need to wrap? does it wrap correctly? or do we need to scroll?",
+        timestamp=datetime.datetime.now().timestamp(),
+        message_type=MessageType.SYSTEM,
+        entry_metadata=None,
+    ),
 ]
 df = pd.DataFrame(logs)
 
@@ -76,6 +81,64 @@ st.markdown(
 
 style = """
 <style>
+    .st-key-header {
+        display: flex;
+        flex-direction: row;
+    }
+
+    .st-key-back-button{
+        width: 15rem;
+        display: flex;
+        justify-content: flex-end;
+        flex-direction: column;
+    }
+
+    [class*="st-key-log-row"] {
+        border-top: 1px solid rgba(250, 250, 250, 0.2);
+        padding-top: 1rem;
+        padding-bottom: 0.5rem;
+    }
+
+    .st-key-logs-container {
+        gap: 0;
+    }
+
+    .pill {
+        border: 1px solid;
+        border-radius: 999px;
+        padding-block: 0.25rem;
+        padding-inline: 1rem;
+        font-size: medium;
+        font-family: monospace;
+    }
+
+    .user {
+        color: rgb(61, 213, 109);
+        border-color: rgb(61, 213, 109);
+        background-color: #011004;
+    }
+
+    .error {
+        color: rgb(255, 75, 75);
+        border-color: rgb(255, 75, 75);
+        background-color: #160202;
+    }
+
+    .system {
+        color: oklch(70.7% 0.165 254.624);
+        border-color: oklch(70.7% 0.165 254.624);
+        background-color: #020a16;
+    }
+
+    .message {
+        font-family: monospace;
+        margin-bottom: 1rem;
+    }
+
+    .pilcrow {
+        color: rgba(250, 250, 250, 0.35);
+    }
+
     .copy-button {
         height: 25px;
         width: 25px;
@@ -83,9 +146,10 @@ style = """
         min-height: 0;
         line-height: 0;
         margin:0;
-        border-radius: 0.3rem;
+        border-radius: 1rem;
         border: 1px solid rgba(250, 250, 250, 0.2);
         background-color: rgb(19, 23, 32);
+        font-size: small;
     }
 
     .copy-button:hover {
@@ -159,8 +223,9 @@ def data_row(label: str, data: str, copiable: bool = True):
         with button_col:
             copy_button(data)
 
-
-st.title("Logs")
+with st.container(key='header'):
+    st.markdown("## Log View")
+    st.button("<- Back to Search", key='back-button', use_container_width=True)
 col_1, col_2 = st.columns([0.6, 0.4], vertical_alignment="top")
 with col_1:
     with st.container(border=True):
@@ -177,26 +242,62 @@ with col_2:
         st.button("`Parent`", use_container_width=True, key="parent-button")
     with st.container(border=True):
         st.write("Children:")
-        with st.container(border=False, height=88):
+        with st.container(border=False, height=90):
             for i in range(10):
                 st.button(
                     f"`Button {i}`", use_container_width=True, key=f"child-button-{i}"
                 )
 
+log_row = 0
+
+def get_type_pill(type):
+    match type.value:
+        case "user":
+            return "<span class='pill user'>USER</span>"
+        case "system":
+            return "<span class='pill system'>SYSTEM</span>"
+        case "error":
+            return "<span class='pill error'>ERROR</span>"
 
 def render_log_row(row: LogEntry):
-    time = datetime.datetime.fromtimestamp(row.timestamp)
-    time_col, message_type_col, message_col, metadata_col = st.columns(
-        [0.1, 0.1, 0.7, 0.1]
-    )
-    with time_col:
-        st.markdown(f"`{time}`")
+    global log_row
+    with st.container(key=f"log-row-{log_row}"):
+        time = datetime.datetime.fromtimestamp(row.timestamp)
+        time_col, message_type_col, message_col, metadata_col = st.columns(
+            [0.18, 0.08, 0.59, 0.15]
+        )
+        with time_col:
+            st.markdown(f"`{time}`")
+
+        with message_type_col:
+            st.markdown(get_type_pill(row.message_type), unsafe_allow_html=True)
+
+        with message_col:
+            text = row.message.replace('\n', '<span class="pilcrow">¶</span>\n')
+            lines = text.split('\n')
+            lines = "<br>".join(lines)
+            st.markdown(f'<div class="message">{lines}</div>', unsafe_allow_html=True)
+
+        with metadata_col:
+            st.write(row.entry_metadata)
+
+    log_row += 1
 
 
-with st.container():
+with st.container(border=True, key="logs-container"):
     for entry in logs:
         render_log_row(entry)
 
+
+# TODO:
+# - figure out how to keep the log column headers in place
+# - Pin the log view metadata and controls (maybe just see if the logs can scroll)
+# - Figure out how to dynamically update the log content for searching or ordering
+# - Test that the metadata viewing works well for larger metadata
+# - Figure out where and how to display the tags and metadata for the branch itself (Maybe we should just use the json thing for that? for all of the data?)
+# - Put in some real test data so that we can actually see how it is working
+# - Figure out how to make a nice button for the branch linking in messages
+# - Figure out how to add copying to the log messages and their timestamps
 
 copy_buttons_script = """
     <script>

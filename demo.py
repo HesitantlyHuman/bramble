@@ -62,7 +62,8 @@ def sync_inside():
     logging.debug("You should really fix this")
 
 
-logging_writer = treelog.backends.RedisWriter.from_socket("127.0.0.1", "6379")
+# logging_writer = treelog.backends.RedisWriter.from_socket("127.0.0.1", "6379")
+logging_writer = treelog.backends.FileWriter("test")
 
 with treelog.TreeLogger("entry", logging_backend=logging_writer) as logger:
     entry_function()
