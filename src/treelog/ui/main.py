@@ -15,6 +15,14 @@ log_metadata = {
     "start": "11-28 17:08:06",
     "end": "11-28 17:10:32",
     "duration": "0d 0h 2m 26s",
+    "tags": [
+        "a",
+        "b",
+        "a tag",
+        "a larger tag",
+        "some-very-weildy-super-long-annoying-tag-that-sucks",
+    ],
+    "metadata": None,
 }
 logs = [
     LogEntry(
@@ -59,6 +67,30 @@ logs = [
         message_type=MessageType.SYSTEM,
         entry_metadata=None,
     ),
+    LogEntry(
+        message="[USER]: I will now provide you with a rubric. The rubric is comprised of criteria, where each criteria has multiple levels of student achievement. Generate a wholistic description of each of the rubric categories from these level descriptions. (Each category should have a description, not each level. The descriptions should not reference the levels whatsoever) Each category should be distinct from each other category. No categories should overlap.[]",
+        timestamp=datetime.datetime.now().timestamp(),
+        message_type=MessageType.USER,
+        entry_metadata=None,
+    ),
+    LogEntry(
+        message="[USER]: Criterion Name: Usability\n\n1: The API is highly usable and intuitive. Parameters are consistent between endpoints, and the help endpoint is informative.\n\n2: The API may be slightly unintuitive at times. Name are consistent between endpoints, but the help endpoint may be...",
+        timestamp=datetime.datetime.now().timestamp(),
+        message_type=MessageType.USER,
+        entry_metadata=None,
+    ),
+    LogEntry(
+        message="[USER]: I will now provide you with a rubric. The rubric is comprised of criteria, where each criteria has multiple levels of student achievement. Generate a wholistic description of each of the rubric categories from these level descriptions. (Each category should have a description, not each level. The descriptions should not reference the levels whatsoever) Each category should be distinct from each other category. No categories should overlap.[]",
+        timestamp=datetime.datetime.now().timestamp(),
+        message_type=MessageType.USER,
+        entry_metadata=None,
+    ),
+    LogEntry(
+        message="[USER]: Criterion Name: Usability\n\n1: The API is highly usable and intuitive. Parameters are consistent between endpoints, and the help endpoint is informative.\n\n2: The API may be slightly unintuitive at times. Name are consistent between endpoints, but the help endpoint may be...",
+        timestamp=datetime.datetime.now().timestamp(),
+        message_type=MessageType.USER,
+        entry_metadata=None,
+    ),
 ]
 df = pd.DataFrame(logs)
 
@@ -81,6 +113,16 @@ st.markdown(
 
 style = """
 <style>
+    .st-key-log-view {
+        max-height: 96vh;
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+    }
+
+    .st-key-log-view > :last-child {
+        overflow: auto;
+    }
+
     .st-key-header {
         display: flex;
         flex-direction: row;
@@ -192,7 +234,7 @@ style = """
     }
 
     .stMainBlockContainer {
-        padding-top: 0;
+        padding-block: 0;
         max-width: 100rem;
     }
 </style>
@@ -217,76 +259,91 @@ def data_row(label: str, data: str, copiable: bool = True):
         with st.container(border=False, height=25):
             st.write(label)
     with data_col:
-        with st.container(border=False, height=25):
-            st.markdown(f"`{data}`")
+        if isinstance(data, str):
+            with st.container(border=False, height=25):
+                st.markdown(f"`{data}`")
+        elif isinstance(data, (list, dict)):
+            with st.container(border=False):
+                st.json(data, expanded=False)
+        else:
+            with st.container(border=False):
+                st.write(data)
+
     if copiable:
         with button_col:
             copy_button(data)
 
-with st.container(key='header'):
-    st.markdown("## Log View")
-    st.button("<- Back to Search", key='back-button', use_container_width=True)
-col_1, col_2 = st.columns([0.6, 0.4], vertical_alignment="top")
-with col_1:
-    with st.container(border=True):
-        data_row("Current Log:", log_name)
-    with st.container(border=True):
-        data_row("Log ID:", log_metadata["id"])
-        data_row("Num entries:", log_metadata["num"], copiable=False)
-        data_row("Duration", log_metadata["duration"], copiable=False)
-        data_row("Start:", log_metadata["start"])
-        data_row("End:", log_metadata["end"])
-with col_2:
-    with st.container(border=True):
-        st.write("Parent:")
-        st.button("`Parent`", use_container_width=True, key="parent-button")
-    with st.container(border=True):
-        st.write("Children:")
-        with st.container(border=False, height=90):
-            for i in range(10):
-                st.button(
-                    f"`Button {i}`", use_container_width=True, key=f"child-button-{i}"
+
+with st.container(key="log-view"):
+    with st.container(key="header"):
+        st.markdown("## Log View")
+        st.button("<- Back to Search", key="back-button", use_container_width=True)
+    col_1, col_2 = st.columns([0.6, 0.4], vertical_alignment="top")
+    with col_1:
+        with st.container(border=True):
+            data_row("Current Log:", log_name)
+        with st.container(border=True):
+            data_row("Log ID:", log_metadata["id"])
+            data_row("Num entries:", log_metadata["num"])
+            data_row("Duration", log_metadata["duration"])
+            data_row("Start:", log_metadata["start"])
+            data_row("End:", log_metadata["end"])
+            data_row("Tags:", log_metadata["tags"])
+            data_row("Metadata:", log_metadata["metadata"])
+    with col_2:
+        with st.container(border=True):
+            st.write("Parent:")
+            st.button("`Parent`", use_container_width=True, key="parent-button")
+        with st.container(border=True):
+            st.write("Children:")
+            with st.container(border=False, height=160):
+                for i in range(5):
+                    st.button(
+                        f"`Button {i}`",
+                        use_container_width=True,
+                        key=f"child-button-{i}",
+                    )
+
+    log_row = 0
+
+    def get_type_pill(type):
+        match type.value:
+            case "user":
+                return "<span class='pill user'>USER</span>"
+            case "system":
+                return "<span class='pill system'>SYSTEM</span>"
+            case "error":
+                return "<span class='pill error'>ERROR</span>"
+
+    def render_log_row(row: LogEntry):
+        global log_row
+        with st.container(key=f"log-row-{log_row}"):
+            time = datetime.datetime.fromtimestamp(row.timestamp)
+            time_col, message_type_col, message_col, metadata_col = st.columns(
+                [0.18, 0.08, 0.59, 0.15]
+            )
+            with time_col:
+                st.markdown(f"`{time}`")
+
+            with message_type_col:
+                st.markdown(get_type_pill(row.message_type), unsafe_allow_html=True)
+
+            with message_col:
+                text = row.message.replace("\n", '<span class="pilcrow">¶</span>\n')
+                lines = text.split("\n")
+                lines = "<br>".join(lines)
+                st.markdown(
+                    f'<div class="message">{lines}</div>', unsafe_allow_html=True
                 )
 
-log_row = 0
+            with metadata_col:
+                st.write(row.entry_metadata)
 
-def get_type_pill(type):
-    match type.value:
-        case "user":
-            return "<span class='pill user'>USER</span>"
-        case "system":
-            return "<span class='pill system'>SYSTEM</span>"
-        case "error":
-            return "<span class='pill error'>ERROR</span>"
+        log_row += 1
 
-def render_log_row(row: LogEntry):
-    global log_row
-    with st.container(key=f"log-row-{log_row}"):
-        time = datetime.datetime.fromtimestamp(row.timestamp)
-        time_col, message_type_col, message_col, metadata_col = st.columns(
-            [0.18, 0.08, 0.59, 0.15]
-        )
-        with time_col:
-            st.markdown(f"`{time}`")
-
-        with message_type_col:
-            st.markdown(get_type_pill(row.message_type), unsafe_allow_html=True)
-
-        with message_col:
-            text = row.message.replace('\n', '<span class="pilcrow">¶</span>\n')
-            lines = text.split('\n')
-            lines = "<br>".join(lines)
-            st.markdown(f'<div class="message">{lines}</div>', unsafe_allow_html=True)
-
-        with metadata_col:
-            st.write(row.entry_metadata)
-
-    log_row += 1
-
-
-with st.container(border=True, key="logs-container"):
-    for entry in logs:
-        render_log_row(entry)
+    with st.container(border=True, key="logs-container"):
+        for entry in logs:
+            render_log_row(entry)
 
 
 # TODO:
