@@ -2,49 +2,9 @@ from typing import Dict, List, Any
 
 import streamlit as st
 
-import datetime
-import pandas as pd
-
 from treelog.ui.datetime_input import datetime_input
 from treelog.ui.navigation import go_to_branch
-
-
-@st.cache_data
-def load_branches_and_tags():
-    branches = [
-        {
-            "name": "some name",
-            "id": "24j4k334j9s03fj3",
-            "tags": ["a", "b", "c", "give me a tag", "yo, lets get some more tags"],
-            "metadata": None,
-            "entries": 5,
-            "start": datetime.datetime(2025, 5, 20, 5, 32, 12),
-            "end": datetime.datetime(2025, 5, 21, 2, 49, 23),
-        },
-        {
-            "name": "some name",
-            "id": "2ofilsfeinfeis",
-            "tags": ["a", "b"],
-            "metadata": {"hey": 124059},
-            "entries": 11,
-            "start": datetime.datetime(2025, 5, 20, 5, 32, 12),
-            "end": datetime.datetime(2025, 5, 21, 2, 59, 23),
-        },
-        {
-            "name": "a differnt name",
-            "id": "sfoeik3l3oifsioefj",
-            "tags": None,
-            "metadata": None,
-            "entries": 11,
-            "start": datetime.datetime(2025, 6, 20, 21, 3, 12),
-            "end": datetime.datetime(2025, 7, 21, 3, 23, 1),
-        },
-    ]
-    branches = pd.DataFrame(branches)
-    return branches, ["a", "b", "c", "give me a tag", "yo, lets get some more tags"]
-
-
-branches, all_tags = load_branches_and_tags()
+from treelog.ui.data import load_branches_and_tags
 
 
 if not "branch_selected" in st.session_state:
