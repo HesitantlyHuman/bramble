@@ -35,14 +35,9 @@ class BranchData:
     """A tree logger branch's full info."""
 
     id: str
+    name: str
+    parent: str | None
+    children: List[str]
     messages: List[LogEntry]
     metadata: Dict[str, str | int | float | bool]
     tags: List[str]
-
-    def __dict__(self):
-        return {
-            "id": self.id,
-            "messages": self.messages,
-            "metadata": self.metadata,
-            "tags": self.tags,
-        }

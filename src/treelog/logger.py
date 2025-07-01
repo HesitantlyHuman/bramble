@@ -362,7 +362,7 @@ class LogBranch:
 
         # TODO: improve this log so that it is easier to link within the UI
         self.log(
-            message=f"Branched Logger: {new_branch.name}",
+            message=f"Branched Logger: `{new_branch.name}`",
             message_type=MessageType.SYSTEM,
             entry_metadata={"branch_id": new_branch.id},
         )

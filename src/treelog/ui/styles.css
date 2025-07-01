@@ -149,6 +149,16 @@ footer {
     min-height: 0;
 }
 
+[class*="st-key-branch-button"] button {
+    min-height: 0;
+    padding-inline: 1rem;
+    padding-block: 0;
+}
+
+[class*="st-key-branch-button"] button p {
+    font-family: monospace;
+}
+
 .st-key-parent-button button {
     height: 30px;
     min-height: 0;

@@ -1,133 +1,107 @@
+from dataclasses import asdict
 import streamlit as st
 import pandas as pd
 import datetime
+import asyncio
 
-from treelog.logs import LogEntry, MessageType
+from treelog.logs import MessageType
+from treelog.backends import FileReader
+from treelog.backend import TreeLogReader
 
 
 @st.cache_data
 def load_branches_and_tags():
-    branches = [
-        {
-            "name": "some name",
-            "id": "24j4k334j9s03fj3",
-            "tags": ["a", "b", "c", "give me a tag", "yo, lets get some more tags"],
-            "metadata": None,
-            "entries": 5,
-            "start": datetime.datetime(2025, 5, 20, 5, 32, 12),
-            "end": datetime.datetime(2025, 5, 21, 2, 49, 23),
-        },
-        {
-            "name": "some name",
-            "id": "2ofilsfeinfeis",
-            "tags": ["a", "b"],
-            "metadata": {"hey": 124059},
-            "entries": 11,
-            "start": datetime.datetime(2025, 5, 20, 5, 32, 12),
-            "end": datetime.datetime(2025, 5, 21, 2, 59, 23),
-        },
-        {
-            "name": "a differnt name",
-            "id": "sfoeik3l3oifsioefj",
-            "tags": None,
-            "metadata": None,
-            "entries": 11,
-            "start": datetime.datetime(2025, 6, 20, 21, 3, 12),
-            "end": datetime.datetime(2025, 7, 21, 3, 23, 1),
-        },
-    ]
-    branches = pd.DataFrame(branches)
-    return branches, ["a", "b", "c", "give me a tag", "yo, lets get some more tags"]
+    if not "backend" in st.session_state:
+        return [], []
+    else:
+        backend: TreeLogReader = st.session_state.backend
+        all_branch_ids = asyncio.run(backend.async_get_branch_ids())
+        all_branch_data = asyncio.run(backend.async_get_branches(all_branch_ids))
+
+        branches = []
+        tags = set()
+
+        for unformatted_data in all_branch_data.values():
+            start = unformatted_data.messages[0].timestamp
+            end = unformatted_data.messages[0].timestamp
+
+            for message in unformatted_data.messages:
+                start = min(start, message.timestamp)
+                end = max(end, message.timestamp)
+
+            branches.append(
+                {
+                    "name": unformatted_data.name,
+                    "id": unformatted_data.id,
+                    "tags": (
+                        unformatted_data.tags
+                        if len(unformatted_data.tags) > 0
+                        else None
+                    ),
+                    "metadata": (
+                        unformatted_data.metadata
+                        if len(unformatted_data.metadata) > 0
+                        else None
+                    ),
+                    "entries": len(unformatted_data.messages),
+                    "start": datetime.datetime.fromtimestamp(start),
+                    "end": datetime.datetime.fromtimestamp(end),
+                }
+            )
+            tags.update(unformatted_data.tags)
+
+        branches = pd.DataFrame(branches)
+        return branches, tags
 
 
 @st.cache_data
 def load_branch_data(id: str):
-    log_name = "generate_initial_summaries"
-    log_metadata = {
-        "id": "d322545fa7754d7f86cb8960",
-        "num": 11,
-        "start": "11-28 17:08:06",
-        "end": "11-28 17:10:32",
-        "duration": "0d 0h 2m 26s",
-        "tags": [
-            "a",
-            "b",
-            "a tag",
-            "a larger tag",
-            "some-very-weildy-super-long-annoying-tag-that-sucks",
-        ],
-        "metadata": None,
-        "parent": "some id",
-        "children": ["some child", "another child", "and then another"],
-    }
-    log_entries = [
-        LogEntry(
-            message="entry number 1",
-            timestamp=datetime.datetime.now().timestamp(),
-            message_type=MessageType.USER,
-            entry_metadata=None,
-        ),
-        LogEntry(
-            message="entry number 2",
-            timestamp=datetime.datetime.now().timestamp(),
-            message_type=MessageType.USER,
-            entry_metadata=None,
-        ),
-        LogEntry(
-            message="a fun system message",
-            timestamp=datetime.datetime.now().timestamp(),
-            message_type=MessageType.SYSTEM,
-            entry_metadata=None,
-        ),
-        LogEntry(
-            message="Oh no, an error!",
-            timestamp=datetime.datetime.now().timestamp(),
-            message_type=MessageType.ERROR,
-            entry_metadata=None,
-        ),
-        LogEntry(
-            message="with metadata",
-            timestamp=datetime.datetime.now().timestamp(),
-            message_type=MessageType.USER,
-            entry_metadata={"some key": 1253, "another": "this value"},
-        ),
-        LogEntry(
-            message="this is a multiline entry\nyay another line!",
-            timestamp=datetime.datetime.now().timestamp(),
-            message_type=MessageType.USER,
-            entry_metadata=None,
-        ),
-        LogEntry(
-            message="what about when the line is long enough that it ends up hitting the edge of the message column and may need to wrap? does it wrap correctly? or do we need to scroll?",
-            timestamp=datetime.datetime.now().timestamp(),
-            message_type=MessageType.SYSTEM,
-            entry_metadata=None,
-        ),
-        LogEntry(
-            message="[USER]: I will now provide you with a rubric. The rubric is comprised of criteria, where each criteria has multiple levels of student achievement. Generate a wholistic description of each of the rubric categories from these level descriptions. (Each category should have a description, not each level. The descriptions should not reference the levels whatsoever) Each category should be distinct from each other category. No categories should overlap.[]",
-            timestamp=datetime.datetime.now().timestamp(),
-            message_type=MessageType.USER,
-            entry_metadata=None,
-        ),
-        LogEntry(
-            message="[USER]: Criterion Name: Usability\n\n1: The API is highly usable and intuitive. Parameters are consistent between endpoints, and the help endpoint is informative.\n\n2: The API may be slightly unintuitive at times. Name are consistent between endpoints, but the help endpoint may be...",
-            timestamp=datetime.datetime.now().timestamp(),
-            message_type=MessageType.USER,
-            entry_metadata=None,
-        ),
-        LogEntry(
-            message="[USER]: I will now provide you with a rubric. The rubric is comprised of criteria, where each criteria has multiple levels of student achievement. Generate a wholistic description of each of the rubric categories from these level descriptions. (Each category should have a description, not each level. The descriptions should not reference the levels whatsoever) Each category should be distinct from each other category. No categories should overlap.[]",
-            timestamp=datetime.datetime.now().timestamp(),
-            message_type=MessageType.USER,
-            entry_metadata=None,
-        ),
-        LogEntry(
-            message="[USER]: Criterion Name: Usability\n\n1: The API is highly usable and intuitive. Parameters are consistent between endpoints, and the help endpoint is informative.\n\n2: The API may be slightly unintuitive at times. Name are consistent between endpoints, but the help endpoint may be...",
-            timestamp=datetime.datetime.now().timestamp(),
-            message_type=MessageType.USER,
-            entry_metadata=None,
-        ),
-    ]
-    from dataclasses import asdict
+    if not "backend" in st.session_state:
+        "", {}, []
+    else:
+        backend: TreeLogReader = st.session_state.backend
+        branch_data = asyncio.run(backend.async_get_branches([id]))
+        branch_data = branch_data[id]
 
-    return log_name, log_metadata, [asdict(entry) for entry in log_entries]
+        start = branch_data.messages[0].timestamp
+        end = branch_data.messages[0].timestamp
+
+        for message in branch_data.messages:
+            start = min(start, message.timestamp)
+            end = max(end, message.timestamp)
+
+        start = datetime.datetime.fromtimestamp(start)
+        end = datetime.datetime.fromtimestamp(end)
+
+        messages = branch_data.messages
+        messages = sorted(messages, key=lambda x: x.timestamp)
+        messages = [asdict(entry) for entry in messages]
+        for message in messages:
+            if isinstance(message["message_type"], str):
+                message["message_type"] = MessageType(message["message_type"])
+
+        return (
+            branch_data.name,
+            {
+                "id": branch_data.id,
+                "num": len(branch_data.messages),
+                "start": start,
+                "end": end,
+                "duration": end - start,
+                "tags": branch_data.tags if len(branch_data.tags) > 0 else None,
+                "metadata": (
+                    branch_data.metadata if len(branch_data.metadata) > 0 else None
+                ),
+                "parent": branch_data.parent,
+                "children": branch_data.children,
+            },
+            messages,
+        )
+
+
+def start_file_backend(path: str):
+    if not "backend" in st.session_state:
+        st.session_state.backend = FileReader(path)
+
+        load_branch_data.clear()
+        load_branches_and_tags.clear()

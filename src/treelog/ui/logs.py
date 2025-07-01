@@ -89,6 +89,10 @@ def render_logs(
         def render_log_row(row: LogEntry):
             nonlocal log_row
 
+            has_branch = (
+                row.entry_metadata is not None and "branch_id" in row.entry_metadata
+            )
+
             if log_row == 0:
                 key = "log-row"
             else:
@@ -105,12 +109,22 @@ def render_logs(
                     st.markdown(get_type_pill(row.message_type), unsafe_allow_html=True)
 
                 with message_col:
-                    text = row.message.replace("\n", '<span class="pilcrow">¶</span>\n')
-                    lines = text.split("\n")
-                    lines = "<br>".join(lines)
-                    st.markdown(
-                        f'<div class="message">{lines}</div>', unsafe_allow_html=True
-                    )
+                    if not has_branch:
+                        text = row.message.replace(
+                            "\n", '<span class="pilcrow">¶</span>\n'
+                        )
+                        lines = text.split("\n")
+                        lines = "<br>".join(lines)
+                        st.markdown(
+                            f'<div class="message">{lines}</div>',
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.button(
+                            label=row.message,
+                            on_click=go_to_branch(row.entry_metadata["branch_id"]),
+                            key=f"branch-button-{log_row}",
+                        )
 
                 with metadata_col:
                     st.write(row.entry_metadata)
@@ -148,8 +162,3 @@ if __name__ == "__main__":
 
     style()
     run_logs()
-
-# TODO:
-# - Figure out how to dynamically update the log content for searching or ordering
-# - Put in some real test data so that we can actually see how it is working
-# - Figure out how to make a nice button for the branch linking in messages

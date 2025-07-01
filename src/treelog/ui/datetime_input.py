@@ -2,11 +2,8 @@ import datetime
 
 import streamlit as st
 
-datetime_id = 0
 
-
-def datetime_input():
-    global datetime_id
+def datetime_input(id: int):
 
     col_1, col_2 = st.columns(2)
     with col_1:
@@ -14,7 +11,7 @@ def datetime_input():
             label="Date",
             value=None,
             label_visibility="collapsed",
-            key=f"datetime-input-date-{datetime_id}",
+            key=f"datetime-input-date-{id}",
         )
     with col_2:
         sub_col_1, sub_col_2, sub_col_3 = st.columns(3)
@@ -25,7 +22,7 @@ def datetime_input():
                 options=[i for i in range(24)],
                 placeholder="HH",
                 label_visibility="collapsed",
-                key=f"datetime-input-hours-{datetime_id}",
+                key=f"datetime-input-hours-{id}",
             )
         with sub_col_2:
             minutes = st.selectbox(
@@ -34,7 +31,7 @@ def datetime_input():
                 options=[i for i in range(60)],
                 placeholder="mm",
                 label_visibility="collapsed",
-                key=f"datetime-input-minutes-{datetime_id}",
+                key=f"datetime-input-minutes-{id}",
             )
         with sub_col_3:
             seconds = st.selectbox(
@@ -43,10 +40,8 @@ def datetime_input():
                 options=[i for i in range(60)],
                 placeholder="ss",
                 label_visibility="collapsed",
-                key=f"datetime-input-seconds-{datetime_id}",
+                key=f"datetime-input-seconds-{id}",
             )
-
-    datetime_id += 1
 
     if date is None:
         return None

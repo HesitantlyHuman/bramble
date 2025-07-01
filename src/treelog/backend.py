@@ -129,86 +129,42 @@ class TreeLogWriter:
 
 
 class TreeLogReader:
-    def get_logs(self, logger_id: str | List[str]) -> BranchData | List[BranchData]:
-        """Get the log for a tree logger.
+    def get_branches(self, branch_ids: List[str]) -> Dict[str, BranchData]:
+        """Get the data for tree logger branches.
 
         Args:
-            logger_id (Union[str, List[str]]): The ID or IDs of the tree loggers.
+            branch_ids (List[str]): The IDs of the tree logger branches.
 
         Returns:
-            Union[TreeLog, List[TreeLog]]: The log for the tree logger or tree loggers.
+            Dict[str, BranchData]: A dict of branch IDs to the corresponding BranchData
+                object.
         """
         raise NotImplementedError()
 
-    async def async_get_logs(
-        self, logger_id: str | List[str]
-    ) -> BranchData | List[BranchData]:
-        """Get the log for a tree logger.
+    async def async_get_branches(self, branch_ids: List[str]) -> Dict[str, BranchData]:
+        """Get the data for tree logger branches.
 
         Args:
-            logger_id (Union[str, List[str]]): The ID or IDs of the tree loggers.
+            branch_ids (List[str]): The IDs of the tree logger branches.
 
         Returns:
-            Union[TreeLog, List[TreeLog]]: The log for the tree logger or tree loggers.
+            Dict[str, BranchData]: A dict of branch IDs to the corresponding BranchData
+                object.
         """
-        return self.get_logs(logger_id=logger_id)
+        return self.get_branches(branch_ids=branch_ids)
 
-    def get_logger_ids_by_tag(self, tag: str) -> List[str]:
-        """Get the IDs of tree loggers with a specific tag.
-
-        Args:
-            tag (str): The tag to search for.
+    def get_branch_ids(self) -> List[str]:
+        """Get the IDs of all tree logger branches.
 
         Returns:
-            List[str]: The IDs of tree loggers with the tag.
+            List[str]: The IDs of all tree logger branches.
         """
         raise NotImplementedError()
 
-    async def async_get_logger_ids_by_tag(self, tag: str) -> List[str]:
-        """Get the IDs of tree loggers with a specific tag.
-
-        Args:
-            tag (str): The tag to search for.
+    async def async_get_branch_ids(self) -> List[str]:
+        """Get the IDs of all tree logger branches.
 
         Returns:
-            List[str]: The IDs of tree loggers with the tag.
+            List[str]: The IDs of all tree logger branches.
         """
-        return self.get_logger_ids_by_tag(tag=tag)
-
-    def get_logger_ids(self) -> List[str]:
-        """Get the IDs of all tree loggers.
-
-        Returns:
-            List[str]: The IDs of all tree loggers.
-        """
-        raise NotImplementedError()
-
-    async def async_get_logger_ids(self) -> List[str]:
-        """Get the IDs of all tree loggers.
-
-        Returns:
-            List[str]: The IDs of all tree loggers.
-        """
-        return self.get_logger_ids()
-
-    def get_logger_metadata(self, id: str) -> Dict[str, Any]:
-        """Gets metadata for a specific logger.
-
-        Args:
-            id (`str`): The ID for the requested logger.
-
-        Returns:
-            Dict[str, Any]: The metada for the logger.
-        """
-        raise NotImplementedError()
-
-    async def async_get_logger_metadata(self, id: str) -> Dict[str, Any]:
-        """Gets metadata for a specific logger.
-
-        Args:
-            id (`str`): The ID for the requested logger.
-
-        Returns:
-            Dict[str, Any]: The metada for the logger.
-        """
-        return self.get_logger_metadata()
+        return self.get_branch_ids()

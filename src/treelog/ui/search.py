@@ -117,7 +117,7 @@ def render_search(branches: List[Dict[str, Any]], all_tags: List[str]):
             with label_col:
                 input_label("Start")
             with input_col:
-                datetime_output = datetime_input()
+                datetime_output = datetime_input(0)
                 st.session_state.datetime_start_filter = datetime_output
 
             # Date and Time End
@@ -125,7 +125,7 @@ def render_search(branches: List[Dict[str, Any]], all_tags: List[str]):
             with label_col:
                 input_label("End")
             with input_col:
-                datetime_output = datetime_input()
+                datetime_output = datetime_input(1)
                 st.session_state.datetime_end_filter = datetime_output
 
             st.divider()

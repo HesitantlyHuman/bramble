@@ -9,7 +9,6 @@ from treelog.backend import TreeLogWriter, TreeLogReader
 from treelog.logs import LogEntry, BranchData
 
 
-# TODO: fix that this overwrites existing files
 class FileWriter(TreeLogWriter):
     _partition: Dict[str, int]
     _data: Dict[int, Dict[str, Any]]
@@ -32,6 +31,7 @@ class FileWriter(TreeLogWriter):
             self._create_partition(partition)
         os.makedirs(base_path, exist_ok=True)
 
+    # TODO: wait until the end of these operations to update the appropriate partitions
     async def async_append_entries(
         self,
         entries: Dict[str, List[LogEntry]],
@@ -128,11 +128,12 @@ class FileWriter(TreeLogWriter):
         self._data[partition] = {}
 
     async def _update_partition(self, partition: int):
+        # TODO: we should be able to do this async, but for some reason that breaks things
         file_path = os.path.join(self.base_path, self._file_format.format(partition))
         data_to_write = self._data[partition]
         data_to_write = json.dumps(data_to_write)
-        async with aiofiles.open(file_path, "w") as f:
-            await f.write(data_to_write)
+        with open(file_path, "w") as f:
+            f.write(data_to_write)
 
 
 class FileReader(TreeLogReader):
@@ -141,67 +142,67 @@ class FileReader(TreeLogReader):
 
     def __init__(self, base_path: str):
         self.base_path = base_path
-        self._has_data = False
+        self.load_data()
 
-    async def load_data(self):
+    def load_data(self):
         self._data = {}
         self._with_tags = {}
         for file_name in os.listdir(self.base_path):
             file_path = os.path.join(self.base_path, file_name)
             try:
-                data = await self.load_partition(file_path)
+                data = self.load_partition(file_path)
                 for logger_id, flow_log in data.items():
                     self._data[logger_id] = flow_log
                     for tag in flow_log.tags:
                         if tag not in self._with_tags:
                             self._with_tags[tag] = []
                         self._with_tags[tag].append(logger_id)
-            except Exception:
+            except Exception as e:
                 pass
 
-    async def load_partition(self, partition_path: str) -> Dict[str, BranchData]:
-        async with aiofiles.open(partition_path, "r") as f:
-            data = await f.read()
+    def load_partition(self, partition_path: str) -> Dict[str, BranchData]:
+        with open(partition_path, "r") as f:
+            data = f.read()
             data = json.loads(data)
 
         # Now convert the data to TreeLog objects
         flow_logs = {}
         for logger_id, flow_data in data.items():
-            messages = [
-                LogEntry(
-                    message=entry["message"],
-                    timestamp=entry["timestamp"],
-                    message_type=entry["message_type"],
-                    entry_metadata=entry["entry_metadata"],
-                )
-                for entry in flow_data["messages"]
-            ]
+            messages = [LogEntry(**entry) for entry in flow_data["messages"]]
+            metadata = {
+                key: value
+                for key, value in flow_data["metadata"].items()
+                if key not in ["parent", "children", "name"]
+            }
             flow_logs[logger_id] = BranchData(
+                id=logger_id,
+                name=flow_data["metadata"]["name"],
+                parent=flow_data["metadata"]["parent"],
+                children=flow_data["metadata"]["children"],
                 messages=messages,
-                metadata=flow_data["metadata"],
+                metadata=metadata,
                 tags=flow_data["tags"],
             )
 
         return flow_logs
 
-    async def async_get_flow_logs(
-        self, logger_id: str | List[str]
-    ) -> BranchData | List[BranchData]:
-        if not self._has_data:
-            await self.load_data()
-            self._has_data = True
-        if isinstance(logger_id, list):
-            return [self._data[id] for id in logger_id]
-        return self._data[logger_id]
+    def get_branches(self, branch_ids: List[str]) -> Dict[str, BranchData]:
+        data = {}
+        for branch_id in branch_ids:
+            data[branch_id] = self._data[branch_id]
+        return data
 
-    async def async_get_flow_log_ids_by_tag(self, tag: str) -> List[str]:
-        if not self._has_data:
-            await self.load_data()
-            self._has_data = True
-        return self._with_tags.get(tag, [])
-
-    async def async_get_flow_log_ids(self) -> List[str]:
-        if not self._has_data:
-            await self.load_data()
-            self._has_data = True
+    def get_branch_ids(self) -> List[str]:
         return list(self._data.keys())
+
+
+if __name__ == "__main__":
+    path = "test"
+    reader = FileReader(path)
+
+    async def main():
+        flow_log_ids = await reader.async_get_branch_ids()
+        data = await reader.async_get_branches(flow_log_ids)
+        print(data)
+
+    asyncio.run(main())
