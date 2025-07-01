@@ -20,7 +20,7 @@ class MessageType(Enum):
             raise ValueError(f"'{input}' is not a valid MessageType!")
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class LogEntry:
     """A log entry for a tree logger."""
 
@@ -29,16 +29,8 @@ class LogEntry:
     message_type: MessageType
     entry_metadata: Dict[str, str | int | float | bool]
 
-    def __dict__(self):
-        return {
-            "message": self.message,
-            "timestamp": self.timestamp,
-            "message_type": self.message_type,
-            "entry_metadata": self.entry_metadata,
-        }
 
-
-@dataclass
+@dataclass(frozen=True, slots=True)
 class BranchData:
     """A tree logger branch's full info."""
 
