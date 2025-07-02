@@ -8,6 +8,7 @@ import uuid
 import time
 
 from treelog.context import _LIVE_BRANCHES, _CURRENT_BRANCH_IDS
+from treelog.utils import validate_log_call
 from treelog.backend import TreeLogWriter
 from treelog.stdlib import hook_logging
 from treelog.logs import (
@@ -179,48 +180,34 @@ class TreeLogger:
     def log(
         self,
         branch_id: str,
-        message: str,
+        message: str | Exception,
         message_type: MessageType | str = MessageType.USER,
         entry_metadata: Dict[str, str | int | float | bool] | None = None,
     ) -> None:
         """Log a message to the tree logger.
 
         Args:
+            branch_id (str): ID of the branch to log this message to.
             message (str): The message to log.
-            message_type (MessageType, optional): The type of the message.
+            message_type (MessageType | str, optional): The type of the message.
                 Defaults to MessageType.USER. Generally, MessageType.SYSTEM is
-                used for system messages internal to the logging system.
+                used for system messages internal to the logging system. If a
+                string is passed, an attempt is made to cast it to MessageType.
             entry_metadata (Dict[str, Union[str, int, float, bool]], optional):
                 Metadata to include with the log entry. Defaults to None.
+
+        Raises:
+            ValueError: If `message` is not a string, `message_type` cannot be
+                converted to a MessageType, `entry_metadata` is not a
+                dictionary or is not None, the keys of `entry_metadata` are not
+                strings, or the values of `entry_metadata` are not `str`, `int`,
+                `float`, or `bool`.
         """
-        if not isinstance(message, str):
-            raise ValueError(
-                f"`message` must be of type `str`, received {type(message)}."
-            )
-
-        if isinstance(message_type, str):
-            message_type = MessageType.from_string(message_type)
-        elif not isinstance(message_type, MessageType):
-            raise ValueError(
-                f"`message_type` must be of type `str` or `MessageType`, received {type(message_type)}."
-            )
-
-        if entry_metadata is not None and not isinstance(entry_metadata, dict):
-            raise ValueError(
-                f"`entry_metadata` must either be `None` or a dictionary, received {type(entry_metadata)}."
-            )
-
-        if entry_metadata is not None:
-            for key, value in entry_metadata.items():
-                if not isinstance(key, str):
-                    raise ValueError(
-                        f"Keys for `entry_metadata` must be of type `str`, received {type(key)}"
-                    )
-
-                if not isinstance(value, (str, int, float, bool)):
-                    raise ValueError(
-                        f"Values for `entry_metadata` must be one of `str`, `int`, `float`, `bool`, received {type(value)}"
-                    )
+        message, message_type, entry_metadata = validate_log_call(
+            message=message,
+            message_type=message_type,
+            entry_metadata=entry_metadata,
+        )
 
         timestamp = datetime.datetime.now().timestamp()
         log_entry = LogEntry(
@@ -260,9 +247,10 @@ class TreeLogger:
 
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type:
-            # TODO: log the exception
-            # TODO: create an exception logging util
-            raise NotImplementedError()
+            try:
+                self.root.log(exc_value, "ERROR")
+            except:
+                pass
 
         # Now, we need to remove ourselves from the current loggers, if we are
         # in them. Since we also know that we are the source of all branches
@@ -360,7 +348,6 @@ class LogBranch:
         new_branch.set_parent(self.id)
         self.add_child(new_branch.id)
 
-        # TODO: improve this log so that it is easier to link within the UI
         self.log(
             message=f"Branched Logger: `{new_branch.name}`",
             message_type=MessageType.SYSTEM,
@@ -384,13 +371,3 @@ class LogBranch:
     def add_metadata(self, metadata: Dict[str, str | int | float | bool]) -> None:
         self.metadata.update(metadata)
         self.tree_logger.update_metadata(self.id, self.metadata)
-
-
-if __name__ == "__main__":
-    logging_backend = TreeLoggingWriter()
-    with TreeLogger("entry", logging_backend=logging_backend):
-        log(
-            "some message",
-            MessageType.USER,
-            {"key": "metadata"},
-        )
