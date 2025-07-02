@@ -11,6 +11,9 @@ def entry_function():
 @treelog.branch
 async def async_entry():
     sync_inside()
+    # If you log using standard python logging, each message may or may not be
+    # present in the branch logs, depending on what level your python logger is
+    # set to.
     logging.info("Just some info, nothing to see here")
     await asyncio.gather(*[async_a(), async_b(), async_b(), async_b()])
 
@@ -21,7 +24,8 @@ async def async_a():
 
     treelog.log("Finished with async_b!", "USER", {"a": 1})
 
-    logging.info("Another test")
+    # This will likely show up in the branch logs
+    logging.warning("This is a warning")
 
     await asyncio.gather(*[async_b(), async_c()])
 
@@ -45,10 +49,6 @@ async def async_c():
 
     sync_inside()
 
-    logging.info("EVEN MORE")
-
-    print("I am printin some stuff man!")
-
     raise ValueError("Some random error")
 
 
@@ -60,10 +60,9 @@ def sync_inside():
 
 logging_writer = treelog.backends.FileWriter("test")
 
-with treelog.TreeLogger(logging_backend=logging_writer) as logger:
+with treelog.TreeLogger(logging_backend=logging_writer):
     entry_function()
 
-    print(logger.root.id)
-
-# No logging
+# No logging, all treelog functions are no-ops if there is not a logger
+# currently in context.
 entry_function()
