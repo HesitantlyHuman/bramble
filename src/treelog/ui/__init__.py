@@ -1,5 +1,5 @@
 try:
-    from treelog.ui.run import run
+    from treelog.ui.treelog_ui import cli
 except ImportError:
 
     class _UIError:
@@ -13,4 +13,4 @@ except ImportError:
                 "To use the tree logging UI, please install the ui extras. (e.g. `pip install treelog[ui]`)"
             )
 
-    run = _UIError()
+    cli = _UIError()

@@ -3,10 +3,6 @@ import logging
 import treelog
 import treelog.backends
 
-# TODO: we should respect the set logging level somehow
-# currently we override it, so that we can get all of the info
-logging.basicConfig(level=logging.WARN)
-
 
 def entry_function():
     asyncio.run(async_entry())
@@ -42,10 +38,10 @@ async def async_c():
     treelog.log("First message")
 
     # Writing some stuff to a different file, should still write to the original as well
-    # logging_writer = treelog.FileTreeLoggingWriter("b")
-    # with treelog.TreeLogger("entry", logging_writer):
-    treelog.log("Second message")
-    treelog.log("Third message", entry_metadata={"id": "lkefidks"})
+    logging_writer = treelog.backends.FileWriter("b")
+    with treelog.TreeLogger("entry", logging_writer):
+        treelog.log("Second message")
+        treelog.log("Third message", entry_metadata={"id": "lkefidks"})
 
     sync_inside()
 
@@ -53,7 +49,7 @@ async def async_c():
 
     print("I am printin some stuff man!")
 
-    # raise ValueError("Some random ass error")
+    raise ValueError("Some random error")
 
 
 @treelog.branch
@@ -62,10 +58,9 @@ def sync_inside():
     logging.debug("You should really fix this")
 
 
-# logging_writer = treelog.backends.RedisWriter.from_socket("127.0.0.1", "6379")
 logging_writer = treelog.backends.FileWriter("test")
 
-with treelog.TreeLogger("entry", logging_backend=logging_writer) as logger:
+with treelog.TreeLogger(logging_backend=logging_writer) as logger:
     entry_function()
 
     print(logger.root.id)

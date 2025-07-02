@@ -9,6 +9,8 @@ from treelog.ui.copy_button import copy_button, enable_copy_buttons
 from treelog.ui.navigation import go_to_branch, go_to_search
 from treelog.ui.data import load_branch_data
 
+# TODO: improve rendering of parent and children to use the names of the branches instead of the ids
+
 
 def data_row(label: str, data: str, copiable: bool = True):
     label_col, data_col, button_col = st.columns([0.25, 0.66, 0.07])
@@ -70,7 +72,7 @@ def render_logs(
                             f"`{child_id}`",
                             use_container_width=True,
                             key=f"child-button-{idx}",
-                            on_click=lambda: go_to_branch(child_id),
+                            on_click=lambda child_id=child_id: go_to_branch(child_id),
                         )
 
         def get_type_pill(type):
@@ -122,7 +124,9 @@ def render_logs(
                     else:
                         st.button(
                             label=row.message,
-                            on_click=go_to_branch(row.entry_metadata["branch_id"]),
+                            on_click=lambda: go_to_branch(
+                                row.entry_metadata["branch_id"]
+                            ),
                             key=f"branch-button-{log_row}",
                         )
 

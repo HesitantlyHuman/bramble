@@ -1,8 +1,7 @@
 from typing import Dict, List, Self
+
 from dataclasses import dataclass
 from enum import Enum
-
-# TODO: create custom serialization and deserialization
 
 
 class MessageType(Enum):
@@ -39,5 +38,5 @@ class BranchData:
     parent: str | None
     children: List[str]
     messages: List[LogEntry]
-    metadata: Dict[str, str | int | float | bool]
     tags: List[str]
+    metadata: Dict[str, str | int | float | bool]

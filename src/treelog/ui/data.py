@@ -105,3 +105,13 @@ def start_file_backend(path: str):
 
         load_branch_data.clear()
         load_branches_and_tags.clear()
+
+
+def start_redis_backend(host: str, port: int):
+    from treelog.backends import RedisReader
+
+    if not "backend" in st.session_state:
+        st.session_state.backend = RedisReader.from_socket(host=host, port=port)
+
+        load_branch_data.clear()
+        load_branches_and_tags.clear()

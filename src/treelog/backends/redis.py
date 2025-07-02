@@ -79,4 +79,8 @@ class RedisWriter(TreeLogWriter):
 
 class RedisReader(TreeLogReader):
     def __init__(self):
-        raise NotImplementedError
+        raise NotImplementedError()
+
+    @classmethod
+    def from_socket(cls, host: str, port: str) -> Self:
+        raise NotImplementedError()

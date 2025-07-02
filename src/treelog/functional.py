@@ -1,5 +1,6 @@
 from typing import Dict, List, Callable, Any, Awaitable
 
+import functools
 import inspect
 
 from treelog.utils import stringify_function_call, validate_log_call
@@ -13,7 +14,8 @@ from treelog.logs import MessageType
 # fan but more powerful, since idk how hard cleaning up the wrapper will be)
 
 
-def _async_branch(func, name, tags=None, metadata=None):
+def _async_branch(func, tags=None, metadata=None):
+    @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         current_logger_ids = _CURRENT_BRANCH_IDS.get()
 
@@ -23,7 +25,7 @@ def _async_branch(func, name, tags=None, metadata=None):
         new_logger_ids = set()
         for logger_id in current_logger_ids:
             old_logger = _LIVE_BRANCHES[logger_id]
-            new_logger = old_logger.branch(name=name)
+            new_logger = old_logger.branch(name=func.__name__)
 
             if tags is not None:
                 new_logger.add_tags(tags)
@@ -44,7 +46,8 @@ def _async_branch(func, name, tags=None, metadata=None):
     return wrapper
 
 
-def _sync_branch(func, name, tags=None, metadata=None):
+def _sync_branch(func, tags=None, metadata=None):
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         current_logger_ids = _CURRENT_BRANCH_IDS.get()
 
@@ -54,7 +57,7 @@ def _sync_branch(func, name, tags=None, metadata=None):
         new_logger_ids = set()
         for logger_id in current_logger_ids:
             old_logger = _LIVE_BRANCHES[logger_id]
-            new_logger = old_logger.branch(name=name)
+            new_logger = old_logger.branch(name=func.__name__)
 
             if tags is not None:
                 new_logger.add_tags(tags)
@@ -76,6 +79,7 @@ def _sync_branch(func, name, tags=None, metadata=None):
 
 
 def _async_tree_log_exceptions(func):
+    @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         try:
             return await func(*args, **kwargs)
@@ -87,6 +91,7 @@ def _async_tree_log_exceptions(func):
 
 
 def _sync_tree_log_exceptions(func):
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -98,6 +103,7 @@ def _sync_tree_log_exceptions(func):
 
 
 def _async_tree_log_args(func):
+    @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         log(
             "Function call:\n" + stringify_function_call(func, args, kwargs),
@@ -118,6 +124,7 @@ def _async_tree_log_args(func):
 
 
 def _sync_tree_log_args(func):
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         log(
             "Function call:\n" + stringify_function_call(func, args, kwargs),
@@ -179,12 +186,12 @@ def branch(
                     f"Values for `metadata` must be one of `str`, `int`, `float`, `bool`, received {type(value)}"
                 )
 
+    @functools.wraps(_func)
     def _branch(func):
         if inspect.iscoroutinefunction(func):
             return _async_tree_log_exceptions(
                 _async_branch(
                     _async_tree_log_args(func),
-                    func.__name__,
                     tags=tags,
                     metadata=metadata,
                 )
@@ -193,7 +200,6 @@ def branch(
             return _sync_tree_log_exceptions(
                 _sync_branch(
                     _sync_tree_log_args(func),
-                    func.__name__,
                     tags=tags,
                     metadata=metadata,
                 )

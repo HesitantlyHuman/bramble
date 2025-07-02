@@ -31,8 +31,8 @@ class TreeLogger:
 
     def __init__(
         self,
-        name: str,
         logging_backend: TreeLogWriter,
+        name: str = "entry",
         debounce: float = 0.25,
         batch_size: int = 50,
         silent: bool = False,
@@ -305,7 +305,7 @@ class LogBranch:
 
     def log(
         self,
-        message: str,
+        message: str | Exception,
         message_type: MessageType | str = MessageType.USER,
         entry_metadata: Dict[str, str | int | float | bool] = None,
     ):

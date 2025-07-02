@@ -26,7 +26,7 @@ Homepage = "https://github.com/HesitantlyHuman/treelog"
 Repository = "https://github.com/HesitantlyHuman/treelog"
 
 [project.scripts]
-treelog-ui = "treelog.ui:main"
+treelog-ui = "treelog.ui:cli"
 
 [tool.hatch.envs.test.scripts]
 test = "pytest {args:tests}"
