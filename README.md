@@ -95,7 +95,7 @@ TODO!
 The flow logger has 3 message types: `SYSTEM`, `USER`, and `ERROR`. Each message type is used to indicate a different kind of log message, and should be used in accordance with the following guidelines:
 
 **SYSTEM**
-- Indicating when a fork has occurred (handled internally by the logger)
+- Indicating when a branch has occurred (handled internally by the logger)
 - Indicating the function arguments of a called function (handled by either the user or the `@branch` decorator)
 - Indicating the return value of a called function (handled by either the user or the `@branch` decorator)
 
