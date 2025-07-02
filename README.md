@@ -1,6 +1,3 @@
-!TODO: update this to include documentation on the pip extras
-
-
 # treelog
 Tree based logging for async python.
 
