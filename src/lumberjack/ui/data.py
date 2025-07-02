@@ -4,9 +4,9 @@ import pandas as pd
 import datetime
 import asyncio
 
-from treelog.logs import MessageType
-from treelog.backends import FileReader
-from treelog.backend import TreeLogReader
+from lumberjack.logs import MessageType
+from lumberjack.backends import FileReader
+from lumberjack.backend import TreeLogReader
 
 
 @st.cache_data
@@ -108,7 +108,7 @@ def start_file_backend(path: str):
 
 
 def start_redis_backend(host: str, port: int):
-    from treelog.backends import RedisReader
+    from lumberjack.backends import RedisReader
 
     if not "backend" in st.session_state:
         st.session_state.backend = RedisReader.from_socket(host=host, port=port)

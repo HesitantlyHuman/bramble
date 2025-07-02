@@ -5,15 +5,15 @@ import asyncio
 import json
 import os
 
-from treelog.backend import TreeLogWriter, TreeLogReader
-from treelog.logs import LogEntry, BranchData
+from lumberjack.backend import LumberjackWriter, LumberjackReader
+from lumberjack.logs import LogEntry, BranchData
 
 
-class FileWriter(TreeLogWriter):
+class FileWriter(LumberjackWriter):
     _partition: Dict[str, int]
     _data: Dict[int, Dict[str, Any]]
     _open_partitions: List[int]
-    _file_format: str = "treelog_logging_storage_partition_{}.jsonl"
+    _file_format: str = "lumberjack_logging_storage_partition_{}.jsonl"
 
     def __init__(
         self,
@@ -136,7 +136,7 @@ class FileWriter(TreeLogWriter):
             f.write(data_to_write)
 
 
-class FileReader(TreeLogReader):
+class FileReader(LumberjackReader):
     _data: Dict[str, BranchData]
     _with_tags: Dict[str, List[str]]
 

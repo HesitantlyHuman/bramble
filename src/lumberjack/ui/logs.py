@@ -4,10 +4,10 @@ import streamlit as st
 
 import datetime
 
-from treelog.logs import LogEntry
-from treelog.ui.copy_button import copy_button, enable_copy_buttons
-from treelog.ui.navigation import go_to_branch, go_to_search
-from treelog.ui.data import load_branch_data
+from lumberjack.logs import LogEntry
+from lumberjack.ui.copy_button import copy_button, enable_copy_buttons
+from lumberjack.ui.navigation import go_to_branch, go_to_search
+from lumberjack.ui.data import load_branch_data
 
 # TODO: improve rendering of parent and children to use the names of the branches instead of the ids
 
@@ -162,7 +162,7 @@ def run_logs():
 
 
 if __name__ == "__main__":
-    from treelog.ui.styles import style
+    from lumberjack.ui.styles import style
 
     style()
     run_logs()

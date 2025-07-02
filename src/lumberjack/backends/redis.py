@@ -3,13 +3,13 @@ from typing import Dict, List, Self
 from redis import asyncio as aioredis
 import msgpack
 
-from treelog.backend import TreeLogReader, TreeLogWriter
-from treelog.logs import LogEntry
+from lumberjack.backend import LumberjackWriter, LumberjackReader
+from lumberjack.logs import LogEntry
 
-REDIS_PREFIX = "treelog:logging:"
+REDIS_PREFIX = "lumberjack:logging:"
 
 
-class RedisWriter(TreeLogWriter):
+class RedisWriter(LumberjackWriter):
     def __init__(self, redis_connection: aioredis.Redis):
         self.redis_connection = redis_connection
 
@@ -77,7 +77,7 @@ class RedisWriter(TreeLogWriter):
         return cls(redis_connection)
 
 
-class RedisReader(TreeLogReader):
+class RedisReader(LumberjackReader):
     def __init__(self):
         raise NotImplementedError()
 

@@ -3,15 +3,16 @@ from typing import Dict, List, Callable, Any, Awaitable
 import functools
 import inspect
 
-from treelog.utils import stringify_function_call, validate_log_call
-from treelog.context import _CURRENT_BRANCH_IDS, _LIVE_BRANCHES
-from treelog.logs import MessageType
+from lumberjack.utils import stringify_function_call, validate_log_call
+from lumberjack.context import _CURRENT_BRANCH_IDS, _LIVE_BRANCHES
+from lumberjack.logs import MessageType
 
 # TODO: improve the exception trace results when the error does not originate in
-# treelog.functional. We currently end up with 4 wrappers in the trace. Either
-# we can flatten the wrapper to just one (nice, bc it is still clear that we are
-# in fact wrapping the function), or clean up the traceback manually. (Less a
-# fan but more powerful, since idk how hard cleaning up the wrapper will be)
+# lumberjack.functional. We currently end up with 4 wrappers in the trace.
+# Either we can flatten the wrapper to just one (nice, bc it is still clear that
+# we are in fact wrapping the function), or clean up the traceback manually.
+# (Less a fan but more powerful, since idk how hard cleaning up the wrapper will
+# be)
 
 
 def _async_branch(func, tags=None, metadata=None):
@@ -153,13 +154,13 @@ def branch(
     """Mark a function for branching.
 
     Using this decorator will mark a function for logging to branch anytime
-    execution enters. Any treelog branches currently in context will create a
+    execution enters. Any lumberjack branches currently in context will create a
     new child, using their `branch` method. Logging that happens in this
     function will be added to the child branches.
 
-    IMPORTANT: `branch` will not do anything if there are no treelog branches in
-    the current context. You must use the TreeLogger context manager pattern if
-    you wish `branch` to do anything.
+    IMPORTANT: `branch` will not do anything if there are no lumberjack branches
+    in the current context. You must use the TreeLogger context manager pattern
+    if you wish `branch` to do anything.
 
     Args:
         tags (List[str], optional): An optional list of tags to add to each
@@ -216,12 +217,12 @@ def log(
     message_type: MessageType | str = MessageType.USER,
     entry_metadata: Dict[str, str | int | float | bool] | None = None,
 ):
-    """Log a message to the active `treelog` branches.
+    """Log a message to the active `lumberjack` branches.
 
-    Will log a message to any treelog branches currently in context. Each branch
-    will receive an identical log entry.
+    Will log a message to any lumberjack branches currently in context. Each
+    branch will receive an identical log entry.
 
-    IMPORTANT: `log` will not do anything if there are no treelog branches in
+    IMPORTANT: `log` will not do anything if there are no lumberjack branches in
     the current context. You must use the TreeLogger context manager pattern if
     you wish `log` to do anything.
 

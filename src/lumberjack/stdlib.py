@@ -1,10 +1,10 @@
 import logging
 
-from treelog.functional import log
-from treelog.logs import MessageType
+from lumberjack.functional import log
+from lumberjack.logs import MessageType
 
 
-class TreeLogHandler(logging.Handler):
+class LumberjackHandler(logging.Handler):
     def emit(self, record):
         try:
             # TODO: improve conversion by adding relevant metadata to the log
@@ -19,6 +19,6 @@ class TreeLogHandler(logging.Handler):
 
 def hook_logging():
     root_logger = logging.getLogger()
-    handler = TreeLogHandler()
+    handler = LumberjackHandler()
     handler.setLevel(logging.NOTSET)
     root_logger.addHandler(handler)

@@ -7,11 +7,11 @@ import queue
 import uuid
 import time
 
-from treelog.context import _LIVE_BRANCHES, _CURRENT_BRANCH_IDS
-from treelog.utils import validate_log_call
-from treelog.backend import TreeLogWriter
-from treelog.stdlib import hook_logging
-from treelog.logs import (
+from lumberjack.context import _LIVE_BRANCHES, _CURRENT_BRANCH_IDS
+from lumberjack.utils import validate_log_call
+from lumberjack.backend import LumberjackWriter
+from lumberjack.stdlib import hook_logging
+from lumberjack.logs import (
     MessageType,
     LogEntry,
 )
@@ -26,12 +26,12 @@ class TreeLogger:
     """
 
     root: "LogBranch"
-    logging_backend: TreeLogWriter
+    logging_backend: LumberjackWriter
     silent: bool
 
     def __init__(
         self,
-        logging_backend: TreeLogWriter,
+        logging_backend: LumberjackWriter,
         name: str = "entry",
         debounce: float = 0.25,
         batch_size: int = 50,
@@ -255,8 +255,8 @@ class TreeLogger:
         # Now, we need to remove ourselves from the current loggers, if we are
         # in them. Since we also know that we are the source of all branches
         # under us, we know that none of our children will still be in use via
-        # the @treelog.branch API, so we can clean up ourselves and our children
-        # from _LIVE_BRANCHES
+        # the @lumberjack.branch API, so we can clean up ourselves and our
+        # children from _LIVE_BRANCHES
 
         current_logger_ids = _CURRENT_BRANCH_IDS.get()
         try:

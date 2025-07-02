@@ -2,7 +2,7 @@ from typing import Dict, Tuple
 
 import traceback
 
-from treelog.logs import MessageType
+from lumberjack.logs import MessageType
 
 
 def stringify_function_call(func, args: list, kwargs: dict):
@@ -26,7 +26,7 @@ def validate_log_call(
     message_type: MessageType | str = MessageType.USER,
     entry_metadata: Dict[str, str | int | float | bool] | None = None,
 ) -> Tuple[str, MessageType, Dict[str, str | int | float | bool] | None]:
-    """Validates a treelog log call and formats objects.
+    """Validates a lumberjack log call and formats objects.
 
     Used to ensure that we have consistent validation that happens as close to
     the user as possible.

@@ -1,22 +1,22 @@
 from typing import Dict, List, Tuple
 
-from treelog.logs import LogEntry, BranchData
+from lumberjack.logs import LogEntry, BranchData
 
 
-class TreeLogWriter:
-    """Writing backend interface for `treelog` logging.
+class LumberjackWriter:
+    """Writing backend interface for `lumberjack` logging.
 
-    Users who wish to extend the capabilities of treelog and use different
+    Users who wish to extend the capabilities of lumberjack and use different
     storage backends for their logs should implement the functions of this
     interface.
 
     IMPORTANT: For each function pair (sync and async) you only need implement
-    one of the given functions. Internally, treelog will always call the async
+    one of the given functions. Internally, lumberjack will always call the async
     function, but the default behavior of the async functions is to call their
     sync counterparts.
 
     For example, you only need to implement either `append_entries` or implement
-    `async_append_entries`, but not both. `treelog` logging and the `treelog` ui
+    `async_append_entries`, but not both. `lumberjack` logging and the `lumberjack` ui
     will work as long as either is implemented.
     """
 
@@ -149,20 +149,20 @@ class TreeLogWriter:
         self.update_branch_metadata(metadata=metadata)
 
 
-class TreeLogReader:
-    """Reading backend interface for `treelog` logging.
+class LumberjackReader:
+    """Reading backend interface for `lumberjack` logging.
 
-    Users who wish to extend the capabilities of treelog and use different
+    Users who wish to extend the capabilities of lumberjack and use different
     storage backends for their logs should implement the functions of this
     interface.
 
     IMPORTANT: For each function pair (sync and async) you only need implement
-    one of the given functions. Internally, treelog will always call the async
+    one of the given functions. Internally, lumberjack will always call the async
     function, but the default behavior of the async functions is to call their
     sync counterparts.
 
     For example, you only need to implement either `get_branches` or implement
-    `async_get_branches`, but not both. `treelog` logging and the `treelog` ui
+    `async_get_branches`, but not both. `lumberjack` logging and the `lumberjack` ui
     will work as long as either is implemented.
     """
 

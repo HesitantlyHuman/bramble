@@ -5,7 +5,7 @@ import click
 
 @click.group()
 def cli():
-    """CLI for treelog-ui — a UI for viewing treelog logs."""
+    """CLI for lumberjack-ui — a UI for viewing lumberjack logs."""
     pass
 
 
@@ -37,7 +37,7 @@ def cli():
 )
 def run(port, backend, redis_host, redis_port, filepath):
     """
-    Launch the treelog UI to view logs.
+    Launch the lumberjack UI to view logs.
     """
 
     # Determine backend arguments
