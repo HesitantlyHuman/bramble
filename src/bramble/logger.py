@@ -21,7 +21,7 @@ class TreeLogger:
     """A branching logger for async processes.
 
     A TreeLogger is a tree-like logger which can be used to log a flow of
-    functions with many child functions. Will seperate each branch into its own
+    functions with many child functions. Will separate each branch into its own
     log.
     """
 
@@ -329,7 +329,7 @@ class LogBranch:
     def branch(self, name: str) -> "LogBranch":
         """Create a new branch from the current.
 
-        Creates a new branch which can be use to log seperately from the current
+        Creates a new branch which can be use to log separately from the current
         branch. Can be done multiple times to create multiple child loggers. The
         children will be linked to the parent logger and recorded in parent's
         logs.

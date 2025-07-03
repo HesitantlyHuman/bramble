@@ -2,9 +2,9 @@ from typing import Dict, List, Any
 
 import streamlit as st
 
-from lumberjack.ui.datetime_input import datetime_input
-from lumberjack.ui.navigation import go_to_branch
-from lumberjack.ui.data import load_branches_and_tags
+from bramble.ui.datetime_input import datetime_input
+from bramble.ui.navigation import go_to_branch
+from bramble.ui.data import load_branches_and_tags
 
 
 if not "branch_selected" in st.session_state:
@@ -164,7 +164,7 @@ def run_search():
 
 
 if __name__ == "__main__":
-    from lumberjack.ui.styles import style
+    from bramble.ui.styles import style
 
     style()
     run_search()

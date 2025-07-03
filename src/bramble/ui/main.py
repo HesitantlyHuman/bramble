@@ -16,7 +16,7 @@ if __name__ == "__main__":
     # First, parse the args
     args = parse_args(sys.argv[1:])
 
-    from lumberjack.ui.data import start_file_backend, start_redis_backend
+    from bramble.ui.data import start_file_backend, start_redis_backend
 
     # Then, we need to start the backend
     if args.backend == "files":
@@ -26,9 +26,9 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Backend type `{args.backend}` is not supported!")
 
-    from lumberjack.ui.search import run_search
-    from lumberjack.ui.logs import run_logs
-    from lumberjack.ui.styles import style
+    from bramble.ui.search import run_search
+    from bramble.ui.logs import run_logs
+    from bramble.ui.styles import style
 
     if not "current_branch_id" in st.session_state:
         st.session_state.current_branch_id = None

@@ -5,7 +5,7 @@ import click
 
 @click.group()
 def cli():
-    """CLI for lumberjack-ui — a UI for viewing lumberjack logs."""
+    """CLI for bramble-ui — a UI for viewing bramble logs."""
     pass
 
 
@@ -37,7 +37,7 @@ def cli():
 )
 def run(port, backend, redis_host, redis_port, filepath):
     """
-    Launch the lumberjack UI to view logs.
+    Launch the bramble UI to view logs.
     """
 
     # Determine backend arguments
@@ -63,7 +63,7 @@ def run(port, backend, redis_host, redis_port, filepath):
         backend_args.extend(["--backend", "files", "--filepath", filepath])
 
     # Get the Streamlit entrypoint
-    ui_path = resources.files("treelog.ui").joinpath("main.py")
+    ui_path = resources.files("bramble.ui").joinpath("main.py")
 
     # Construct the final argv for streamlit
     sys.argv = [
