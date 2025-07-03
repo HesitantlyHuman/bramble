@@ -1,19 +1,18 @@
 from typing import Dict, List, Any, Tuple
 
-import aiofiles
 import asyncio
 import json
 import os
 
-from lumberjack.backend import LumberjackWriter, LumberjackReader
-from lumberjack.logs import LogEntry, BranchData
+from bramble.backend import BrambleWriter, BrambleReader
+from bramble.logs import LogEntry, BranchData
 
 
-class FileWriter(LumberjackWriter):
+class FileWriter(BrambleWriter):
     _partition: Dict[str, int]
     _data: Dict[int, Dict[str, Any]]
     _open_partitions: List[int]
-    _file_format: str = "lumberjack_logging_storage_partition_{}.jsonl"
+    _file_format: str = "bramble_logging_storage_partition_{}.jsonl"
 
     def __init__(
         self,
@@ -136,7 +135,7 @@ class FileWriter(LumberjackWriter):
             f.write(data_to_write)
 
 
-class FileReader(LumberjackReader):
+class FileReader(BrambleReader):
     _data: Dict[str, BranchData]
     _with_tags: Dict[str, List[str]]
 

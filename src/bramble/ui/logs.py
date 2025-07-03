@@ -4,10 +4,10 @@ import streamlit as st
 
 import datetime
 
-from lumberjack.logs import LogEntry
-from lumberjack.ui.copy_button import copy_button, enable_copy_buttons
-from lumberjack.ui.navigation import go_to_branch, go_to_search
-from lumberjack.ui.data import load_branch_data
+from bramble.ui.copy_button import copy_button, enable_copy_buttons
+from bramble.ui.navigation import go_to_branch, go_to_search
+from bramble.ui.data import load_branch_data
+from bramble.logs import LogEntry
 
 # TODO: improve rendering of parent and children to use the names of the branches instead of the ids
 
@@ -162,7 +162,7 @@ def run_logs():
 
 
 if __name__ == "__main__":
-    from lumberjack.ui.styles import style
+    from bramble.ui.styles import style
 
     style()
     run_logs()

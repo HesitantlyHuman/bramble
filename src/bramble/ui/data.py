@@ -4,9 +4,9 @@ import pandas as pd
 import datetime
 import asyncio
 
-from lumberjack.logs import MessageType
-from lumberjack.backends import FileReader
-from lumberjack.backend import TreeLogReader
+from bramble.logs import MessageType
+from bramble.backends import FileReader
+from bramble.backend import BrambleReader
 
 
 @st.cache_data
@@ -14,7 +14,7 @@ def load_branches_and_tags():
     if not "backend" in st.session_state:
         return [], []
     else:
-        backend: TreeLogReader = st.session_state.backend
+        backend: BrambleReader = st.session_state.backend
         all_branch_ids = asyncio.run(backend.async_get_branch_ids())
         all_branch_data = asyncio.run(backend.async_get_branches(all_branch_ids))
 
@@ -59,7 +59,7 @@ def load_branch_data(id: str):
     if not "backend" in st.session_state:
         "", {}, []
     else:
-        backend: TreeLogReader = st.session_state.backend
+        backend: BrambleReader = st.session_state.backend
         branch_data = asyncio.run(backend.async_get_branches([id]))
         branch_data = branch_data[id]
 
@@ -108,7 +108,7 @@ def start_file_backend(path: str):
 
 
 def start_redis_backend(host: str, port: int):
-    from lumberjack.backends import RedisReader
+    from bramble.backends import RedisReader
 
     if not "backend" in st.session_state:
         st.session_state.backend = RedisReader.from_socket(host=host, port=port)

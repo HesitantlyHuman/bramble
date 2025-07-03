@@ -3,13 +3,13 @@ from typing import Dict, List, Self
 from redis import asyncio as aioredis
 import msgpack
 
-from lumberjack.backend import LumberjackWriter, LumberjackReader
-from lumberjack.logs import LogEntry
+from bramble.backend import BrambleWriter, BrambleReader
+from bramble.logs import LogEntry
 
-REDIS_PREFIX = "lumberjack:logging:"
+REDIS_PREFIX = "bramble:logging:"
 
 
-class RedisWriter(LumberjackWriter):
+class RedisWriter(BrambleWriter):
     def __init__(self, redis_connection: aioredis.Redis):
         self.redis_connection = redis_connection
 
@@ -77,7 +77,7 @@ class RedisWriter(LumberjackWriter):
         return cls(redis_connection)
 
 
-class RedisReader(LumberjackReader):
+class RedisReader(BrambleReader):
     def __init__(self):
         raise NotImplementedError()
 

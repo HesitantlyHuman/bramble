@@ -4,7 +4,7 @@ import streamlit as st
 
 
 def load_styles() -> str:
-    style_path = resources.files("lumberjack.ui").joinpath("styles.css")
+    style_path = resources.files("bramble.ui").joinpath("styles.css")
     return style_path.read_text()
 
 
@@ -13,5 +13,5 @@ def apply_styles(styles: str):
 
 
 def style():
-    st.set_page_config(page_title="`lumberjack` Viewer", layout="wide")
+    st.set_page_config(page_title="`bramble` Viewer", layout="wide")
     apply_styles(load_styles())

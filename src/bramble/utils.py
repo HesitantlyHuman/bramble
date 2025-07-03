@@ -2,7 +2,7 @@ from typing import Dict, Tuple
 
 import traceback
 
-from lumberjack.logs import MessageType
+from bramble.logs import MessageType
 
 
 def stringify_function_call(func, args: list, kwargs: dict):

@@ -1,10 +1,10 @@
 import logging
 
-from lumberjack.functional import log
-from lumberjack.logs import MessageType
+from bramble.functional import log
+from bramble.logs import MessageType
 
 
-class LumberjackHandler(logging.Handler):
+class BrambleHandler(logging.Handler):
     def emit(self, record):
         try:
             # TODO: improve conversion by adding relevant metadata to the log
@@ -19,6 +19,6 @@ class LumberjackHandler(logging.Handler):
 
 def hook_logging():
     root_logger = logging.getLogger()
-    handler = LumberjackHandler()
+    handler = BrambleHandler()
     handler.setLevel(logging.NOTSET)
     root_logger.addHandler(handler)

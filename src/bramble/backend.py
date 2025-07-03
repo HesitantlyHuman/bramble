@@ -1,22 +1,22 @@
 from typing import Dict, List, Tuple
 
-from lumberjack.logs import LogEntry, BranchData
+from bramble.logs import LogEntry, BranchData
 
 
-class LumberjackWriter:
-    """Writing backend interface for `lumberjack` logging.
+class BrambleWriter:
+    """Writing backend interface for `bramble` logging.
 
-    Users who wish to extend the capabilities of lumberjack and use different
+    Users who wish to extend the capabilities of bramble and use different
     storage backends for their logs should implement the functions of this
     interface.
 
     IMPORTANT: For each function pair (sync and async) you only need implement
-    one of the given functions. Internally, lumberjack will always call the async
+    one of the given functions. Internally, bramble will always call the async
     function, but the default behavior of the async functions is to call their
     sync counterparts.
 
     For example, you only need to implement either `append_entries` or implement
-    `async_append_entries`, but not both. `lumberjack` logging and the `lumberjack` ui
+    `async_append_entries`, but not both. `bramble` logging and the `bramble` ui
     will work as long as either is implemented.
     """
 
@@ -149,20 +149,20 @@ class LumberjackWriter:
         self.update_branch_metadata(metadata=metadata)
 
 
-class LumberjackReader:
-    """Reading backend interface for `lumberjack` logging.
+class BrambleReader:
+    """Reading backend interface for `bramble` logging.
 
-    Users who wish to extend the capabilities of lumberjack and use different
+    Users who wish to extend the capabilities of bramble and use different
     storage backends for their logs should implement the functions of this
     interface.
 
     IMPORTANT: For each function pair (sync and async) you only need implement
-    one of the given functions. Internally, lumberjack will always call the async
+    one of the given functions. Internally, bramble will always call the async
     function, but the default behavior of the async functions is to call their
     sync counterparts.
 
     For example, you only need to implement either `get_branches` or implement
-    `async_get_branches`, but not both. `lumberjack` logging and the `lumberjack` ui
+    `async_get_branches`, but not both. `bramble` logging and the `bramble` ui
     will work as long as either is implemented.
     """
 

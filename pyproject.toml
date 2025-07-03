@@ -3,7 +3,7 @@ requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "lumberjack"
+name = "bramble"
 version = "0.0.1"
 description = "Tree based logging for async python"
 authors = [
@@ -12,7 +12,6 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "aiofiles",
 ]
 keywords = [
     "logging",
@@ -21,7 +20,7 @@ keywords = [
     "tree",
     "ui",
     "branch",
-    "lumberjack",
+    "bramble",
     "python",
     "threading",
     "scoped"
@@ -33,11 +32,11 @@ dev = ["pytest", "black"]
 ui = ["streamlit"]
 
 [project.urls]
-Homepage = "https://github.com/HesitantlyHuman/lumberjack"
-Repository = "https://github.com/HesitantlyHuman/lumberjack"
+Homepage = "https://github.com/HesitantlyHuman/bramble"
+Repository = "https://github.com/HesitantlyHuman/bramble"
 
 [project.scripts]
-lumberjack-ui = "lumberjack.ui:cli"
+bramble-ui = "bramble.ui:cli"
 
 [tool.hatch.envs.test.scripts]
 test = "pytest {args:tests}"
