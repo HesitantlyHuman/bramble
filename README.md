@@ -1,18 +1,16 @@
 # bramble
-Tree based logging for python.
+Tree-based logging for python.
 
-Normal logging struggles in async python, since logs will often get mixed up,
-and it may not be clear what happened in what order. `bramble` instead groups
-logs into a tree like structure. This way, any result can be easily broken down
-into its steps. The tree structure is to isolate different synchronous paths
-through the async system, so that each log is ordered, and the logic can be
-easily followed.
+Traditional logging in async python will usually result in confusing, unordered logs. Many different functions and contexts may be logging to the same stream simultaneously, making it difficult to follow execution paths, or determine cause and effect. `bramble` solves this issue by splitting your logs into branches, which are organized in a tree like structure.
+
+This way, you can:
+- Follow the logic of your program (async, or otherwise)
+- Debug concurrent tasks
+- Understand how a final result was composed
 
 ## Basic Usage
 ### Creating a Logger
-Creating a logger is as easy as defining a backend, and then creating a
-`TreeLogger`. Generally, it is advisable to use `bramble` loggers as context
-managers.
+Getting started logging with `bramble` is as easy as defining a backend, and then creating a `TreeLogger`. It is recommended to use `TreeLogger` as a context manager.
 
 ```python
 import bramble
@@ -43,14 +41,13 @@ another_branch = root_branch.branch("new branch")
 another_branch.log(message="Some message to log")
 ```
 
-### Branching
-The main feature of `bramble` is the ability to branch logs, so that logs are
-separate between concurrently running functions. Once again, there is the
-context approach, and the manual approach.
+When logging, the default `MessageType` is `"USER"`. You may also provide arbitrary metadata that you wish to be associated with your message, in a flat dictionary. Accepted value types are: `str`, `int`, `float`, and `bool`.
 
-If you are using a context manager, then you can simply decorate any functions
-that you wish to be branch points. Any time these functions are called,
-`bramble` will automatically create a new branch for logging. For example:
+### Branching
+Branching is `bramble`'s core feature. The ability to split your logs, so that they remain correlated and ordered is what allows `bramble` to untangle complex execution paths. Once again, there is a context-based approach, and manual approach.
+
+#### Context-based Branching (Recommended)
+Simply decorate any functions that you wish to be a branch point. Any time these functions are called, `bramble` will automatically create a new branch:
 
 ```python
 @bramble.branch
@@ -66,13 +63,10 @@ with bramble.TreeLogger(logging_backend):
     asyncio.run(async_fn())
 ```
 
-In the above example, the logs in each function will be kept separate, even
-between runs of the same function. While this may not be useful for this toy
-example, anytime your code includes `asyncio.gather` or similar, it can be
-invaluable.
+Each call to a decorated function will result in a unique log branch, and any existing log branches will receive a short message linking to the called function.
 
-The manual branching approach can be easily demonstrated by this previous
-example:
+#### Manual Branching
+If you find yourself needing to manage things by hand, simply branch any existing `LogBranch` object. Each branch must be provided a name.
 
 ```python
 tree_logger = bramble.TreeLogger(logging_backend)
@@ -81,20 +75,18 @@ another_branch = root_branch.branch("new branch")
 another_branch.log(message="Some message to log")
 ```
 
-Anytime a logger branch is branched, a log entry will be added to parent branch
-at the appropriate location.
-
 ### Demo File
-For a more full example of `bramble` in use, please refer to
+For a complete example of `bramble` in use, please refer to
 [`demo.py`](demo.py).
 
 ## Installing
-To install `bramble`, simply use pip
+To install with pip
 ```shell
 pip install bramble
 ```
 
-However, if you want to use the built-in Streamlit UI to view the logs that you
+#### Extras
+If you want to use `bramble`'s Streamlit UI to view the logs that you
 create, you should install `bramble` with the `ui` extras.
 ```shell
 pip install bramble[ui]
@@ -107,9 +99,7 @@ pip install bramble[redis]
 
 ## UI
 If you install `bramble` with the `ui` extras, `bramble` provides access to a
-simple Streamlit UI which you can use to view the logs. If you have installed
-`bramble` with the `ui` extras, simply use the command `bramble-ui` to run the
-UI. Currently, you can choose to point the UI at either a file-based or redis
+simple Streamlit UI which you can use to view the logs. Simply use the command `bramble-ui` to run the UI. Currently, you can choose to point the UI at either a file-based or redis
 backend.
 
 ```
@@ -127,50 +117,33 @@ Options:
 ```
 
 Once you have launched the UI, you can access it on your local machine via the
-port that you provided, in a browser of your choice, where you will see the
-search screen. This screen will allow you to select from any branch that was
-saved to the currently running backend.
+port that you provided, in a browser of your choice.
 
 ![Search View Example](docs\search.png)
-
-From there, you can open any branch that you wish to view, and you will enter
-the logs screen. This screen allows you to navigate the tree of the branch you
-selected, as well as return to the search screen.
 
 ![Log View Example](docs\logs.png)
 
 ## Best Practices
 ### Message Types
-The flow logger has 3 message types: `SYSTEM`, `USER`, and `ERROR`. Each message
-type is used to indicate a different kind of log message, and should be used in
-accordance with the following guidelines:
+`bramble` currently supports 3 message types: `SYSTEM`, `USER`, and `ERROR`.
 
 **SYSTEM**
-- Indicating when a branch has occurred (handled internally by the logger)
-- Indicating the function arguments of a called function (handled by either the
-  user or the `@branch` decorator)
-- Indicating the return value of a called function (handled by either the user
-  or the `@branch` decorator)
-
-**ERROR**
-- Indicating an error which occurred during the function call (handled by the
+- Branch creation (auto-handled)
+- Arguments and return values (handled by either the
   user or the `@branch` decorator)
 
 **USER**
-- Logging potentially error-prone modifications/transformations of variables
-- Logging calls to external services and the parameters of those calls
-- Logging the results of external services and the parameters of those results
-- Logging important control flow
+- Changes to application state
+- External API calls and responses
+- Important control flow
+
+**ERROR**
+- Exceptions or error conditions (handled by the
+  user or the `@branch` decorator)
 
 ### Branching
-Branching should be done whenever entering a new context, as mentioned above.
-Follow the following guidelines for branching:
-- Fork whenever calling a new function
-- Fork whenever the execution path becomes asynchronous
-
-As a general guideline, do not have a logger associated with an object or class,
+Branching should be done whenever entering a new context, as mentioned above. As a general guideline, do not have a logger associated with an object or class,
 instead log on the function level.
-
 
 ## Contributing
 If you wish to contribute, please install `bramble` with the `dev` extras. We
