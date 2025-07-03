@@ -37,6 +37,14 @@ class TreeLogger:
         batch_size: int = 50,
         silent: bool = False,
     ):
+        if not isinstance(logging_backend, BrambleWriter):
+            raise ValueError(
+                f"`logging_backend` must be of type `BrambleWriter`, received {type(logging_backend)}."
+            )
+
+        if not isinstance(name, str):
+            raise ValueError(f"`name` must be of type `str`, received {type(name)}.")
+
         self.logging_backend = logging_backend
         self.silent = silent
 

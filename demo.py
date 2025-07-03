@@ -30,11 +30,13 @@ async def async_a():
     await asyncio.gather(*[async_b(), async_c()])
 
 
-@bramble.branch(metadata={"a": 1})
+@bramble.branch({"a": 1})
 async def async_b():
     bramble.log("Started async_b", "ERROR")
     await async_c()
     logging.debug("I am a debug message!")
+
+    bramble.apply({"some tag": "some data"})
 
 
 @bramble.branch
@@ -43,13 +45,13 @@ async def async_c():
 
     # Writing some stuff to a different file, should still write to the original as well
     logging_writer = bramble.backends.FileWriter("b")
-    with bramble.TreeLogger("entry", logging_writer):
+    with bramble.TreeLogger(logging_writer):
         bramble.log("Second message")
         bramble.log("Third message", entry_metadata={"id": "lkefidks"})
 
     sync_inside()
 
-    raise ValueError("Some random error")
+    # raise ValueError("Some random error")
 
 
 @bramble.branch
