@@ -75,6 +75,40 @@ another_branch = root_branch.branch("new branch")
 another_branch.log(message="Some message to log")
 ```
 
+### Metadata
+Each of `bramble`'s `LogBranch`s supports arbitrary user metadata and tags. Tags make it easier to find and identify branches, and metadata allows to you attach additional information for easy programmatic access later.
+
+#### Using the `@branch` decorator
+The easiest way to add tags and metadata to a branch is using the `@branch` decorator. Either use the `tag` and `metadata` keywords, or just place any number of lists and dictionaries as arguments.
+
+```python
+@bramble.branch(tags=["tag one", "tag two"])
+@bramble.branch(metadata={"item" : "value", "another": 1.0})
+@bramble.branch(["a tag"])
+@bramble.branch(["a tag"], {"key", 234, "key 2": 215}, ["b tag", "c tag"], {"key_2": 120}) # Dictionary which come after will update previous arguments
+```
+
+#### Using `apply`
+If you do not know your tags or metadata before runtime, you can still use tags and metadata with your in-context branches. Simply use the `apply` function to apply tags and metadata to all current branches. The interface for this function is almost identical to that of the decorator.
+
+```python
+@bramble.branch
+async def my_function()
+  ...
+  bramble.apply(tags=["tag one", "tag two"])
+  bramble.apply(["a tag"], {"key", 234, "key 2": 215}, ["b tag", "c tag"], {"key_2": 120})
+```
+
+#### Manual Tagging and Metadata
+The final way to add tags or metadata to a branch is to do so directly. If you have a `LogBranch` object, you can simply call `add_tags` or `add_metadata`.
+
+```python
+root = my_logger.root
+branch = root.branch("my branch")
+branch.add_tags(["tag_one", "tag_two"])
+branch.add_metadata({"key": 234})
+```
+
 ### Demo File
 For a complete example of `bramble` in use, please refer to
 [`demo.py`](demo.py).

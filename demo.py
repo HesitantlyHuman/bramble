@@ -49,6 +49,8 @@ async def async_c():
         bramble.log("Second message")
         bramble.log("Third message", entry_metadata={"id": "lkefidks"})
 
+        bramble.apply(["z"], {"some": 1}, tags=["a", "b", "c"])
+
     sync_inside()
 
     # raise ValueError("Some random error")

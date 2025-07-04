@@ -3,10 +3,13 @@ from typing import Dict, List, Callable, Any, Awaitable
 import functools
 import inspect
 
-from bramble.utils import stringify_function_call, validate_log_call
+from bramble.utils import (
+    stringify_function_call,
+    validate_log_call,
+    validate_tags_and_metadata,
+)
 from bramble.context import _CURRENT_BRANCH_IDS, _LIVE_BRANCHES
 from bramble.logs import MessageType
-from bramble.logger import LogBranch
 
 # TODO: improve the exception trace results when the error does not originate in
 # bramble.functional. We currently end up with 4 wrappers in the trace.
@@ -170,32 +173,19 @@ def branch(
         metadata: (Dict[str, str | int | float | bool], optional): An optional
             list of metadata to add to each branch for this function.
     """
-    # TODO: add support for arg based syntax
-    if tags is not None and not isinstance(tags, list):
-        raise ValueError(f"`tags` must be of type `list`, received {type(tags)}.")
-    if tags is not None and not all([isinstance(tag, str) for tag in tags]):
-        raise ValueError("`tags` must all be of type `str`.")
-    if metadata is not None and not isinstance(metadata, dict):
-        raise ValueError(
-            f"`metadata` must be of type `dict`, received {type(metadata)}."
-        )
-    if metadata is not None:
-        for key, value in metadata.items():
-            if not isinstance(key, str):
-                raise ValueError(
-                    f"Keys for `metadata` must be of type `str`, received {type(key)}"
-                )
-            if not isinstance(value, (str, int, float, bool)):
-                raise ValueError(
-                    f"Values for `metadata` must be one of `str`, `int`, `float`, `bool`, received {type(value)}"
-                )
+    # We might have a tag or metadata arg that got passed into _func, so we should check
+    if _func is not None and not inspect.isfunction(_func):
+        args = (_func, *args)
+        _func = None
+
+    tags, metadata = validate_tags_and_metadata(*args, tags=tags, metadata=metadata)
 
     @functools.wraps(_func)
     def _branch(func):
         if inspect.iscoroutinefunction(func):
             return _async_tree_log_exceptions(
                 _async_branch(
-                    _async_tree_log_args(func),
+                    func=_async_tree_log_args(func),
                     tags=tags,
                     metadata=metadata,
                 )
@@ -203,7 +193,7 @@ def branch(
         else:
             return _sync_tree_log_exceptions(
                 _sync_branch(
-                    _sync_tree_log_args(func),
+                    func=_sync_tree_log_args(func),
                     tags=tags,
                     metadata=metadata,
                 )
@@ -257,7 +247,7 @@ def log(
         return
 
     for branch_id in current_branch_ids:
-        branch: LogBranch = _LIVE_BRANCHES[branch_id]
+        branch = _LIVE_BRANCHES[branch_id]
         branch.log(
             message=message,
             message_type=message_type,
@@ -293,45 +283,15 @@ def apply(
     if len(args) == 0 and tags is None and metadata is None:
         raise ValueError(f"Must provide at least one of `tags` or `metadata`.")
 
-    collected_metadata = {}
-    collected_tags = set()
-
-    for arg in args:
-        if isinstance(arg, list):
-            if not all([isinstance(element, str) for element in arg]):
-                raise ValueError(
-                    f"Argments of type `list` must be a list of string tags, received {arg}"
-                )
-            collected_tags.update(arg)
-        elif isinstance(arg, dict):
-            for key, value in arg.items():
-                if not isinstance(key, str):
-                    raise ValueError(
-                        f"Arguments of type `dict` must have string keys, received {type(key)}"
-                    )
-                if not isinstance(value, (str, int, float, bool)):
-                    raise ValueError(
-                        f"Arguments of type `dict` must have values of type `str`, `int`, `float`, or `bool`, received {type(value)}"
-                    )
-            collected_metadata.update(arg)
-        else:
-            raise ValueError(
-                f"Arguments must be of type `list` or `dict`, received {type(arg)}"
-            )
-
-    if tags is not None:
-        collected_tags.update(tags)
-
-    if metadata is not None:
-        collected_metadata.update(metadata)
+    tags, metadata = validate_tags_and_metadata(*args, tags=tags, metadata=metadata)
 
     current_branch_ids = _CURRENT_BRANCH_IDS.get()
     if current_branch_ids is None:
         return
 
     for branch_id in current_branch_ids:
-        branch: LogBranch = _LIVE_BRANCHES[branch_id]
-        if len(collected_tags) > 0:
-            branch.add_tags(list(collected_tags))
-        if len(collected_metadata) > 0:
-            branch.add_metadata(collected_metadata)
+        branch = _LIVE_BRANCHES[branch_id]
+        if tags is not None:
+            branch.add_tags(tags)
+        if metadata is not None:
+            branch.add_metadata(metadata)

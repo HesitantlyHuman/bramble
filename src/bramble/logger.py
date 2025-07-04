@@ -364,18 +364,22 @@ class LogBranch:
 
         return new_branch
 
+    # TODO: we need to do type checking on these inputs, so that we do not crash the thread
     def add_child(self, child_id: str) -> None:
         self.children.append(child_id)
         self.tree_logger.update_tree(self.id, self.parent, self.children)
 
+    # TODO: we need to do type checking on these inputs, so that we do not crash the thread
     def set_parent(self, parent_id: str) -> None:
         self.parent = parent_id
         self.tree_logger.update_tree(self.id, self.parent, self.children)
 
+    # TODO: we need to do type checking on these inputs, so that we do not crash the thread
     def add_tags(self, tags: List[str]) -> None:
         self.tags.extend(tags)
         self.tree_logger.update_tags(self.id, self.tags)
 
+    # TODO: we need to do type checking on these inputs, so that we do not crash the thread
     def add_metadata(self, metadata: Dict[str, str | int | float | bool]) -> None:
         self.metadata.update(metadata)
         self.tree_logger.update_metadata(self.id, self.metadata)
