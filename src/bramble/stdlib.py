@@ -7,11 +7,27 @@ from bramble.logs import MessageType
 class BrambleHandler(logging.Handler):
     def emit(self, record):
         try:
-            # TODO: improve conversion by adding relevant metadata to the log
-            # entry
+            metadata = {
+                "logger": record.name,
+                "level": record.levelname,
+                "filename": record.filename,
+                "lineno": record.lineno,
+                "funcName": record.funcName,
+                "module": record.module,
+                "threadName": record.threadName,
+                "processName": record.processName,
+                "created": record.created,
+            }
+
+            # Convert values to only allowed types: str, int, float, bool
+            for key, value in list(metadata.items()):
+                if not isinstance(value, (str, int, float, bool)):
+                    metadata[key] = str(value)
+
             log(
-                f"[{record.levelname}] {record.name}: {record.msg}",
+                f"[{record.levelname}] {record.name}: {record.getMessage()}",
                 MessageType.USER if record.levelno < 30 else MessageType.ERROR,
+                metadata,
             )
         except Exception:
             self.handleError(record)

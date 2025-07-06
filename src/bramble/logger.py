@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List
 
 import threading
 import datetime
@@ -226,15 +226,15 @@ class TreeLogger:
         )
         self._tasks.put((0, branch_id, log_entry))
 
-    def update_tree(self, branch_id: str, parent: str, children: List[str]) -> None:
+    def _update_tree(self, branch_id: str, parent: str, children: List[str]) -> None:
         self._tasks.put((1, branch_id, parent, children))
 
-    def update_metadata(
+    def _update_metadata(
         self, branch_id: str, metadata: Dict[str, str | int | float | bool]
     ) -> None:
         self._tasks.put((2, branch_id, metadata))
 
-    def update_tags(self, branch_id: str, tags: List[str]) -> None:
+    def _update_tags(self, branch_id: str, tags: List[str]) -> None:
         self._tasks.put((3, branch_id, tags))
 
     def __enter__(self):
@@ -309,7 +309,7 @@ class LogBranch:
             id = str(uuid.uuid4().hex)[:24]
         self.id = id
 
-        self.tree_logger.update_metadata(self.id, self.metadata)
+        self.tree_logger._update_metadata(self.id, self.metadata)
 
     def log(
         self,
@@ -346,7 +346,7 @@ class LogBranch:
             name (str): The name of the new tree logger.
 
         Returns:
-            LogBranch: The new tree logger.
+            LogBranch: The new `bramble` branch.
         """
         new_branch = LogBranch(
             name=name,
@@ -364,22 +364,46 @@ class LogBranch:
 
         return new_branch
 
-    # TODO: we need to do type checking on these inputs, so that we do not crash the thread
     def add_child(self, child_id: str) -> None:
+        if not isinstance(child_id, str):
+            raise ValueError(
+                f"`child_id` must be of type `str`, received {type(child_id)}."
+            )
         self.children.append(child_id)
-        self.tree_logger.update_tree(self.id, self.parent, self.children)
+        self.tree_logger._update_tree(self.id, self.parent, self.children)
 
-    # TODO: we need to do type checking on these inputs, so that we do not crash the thread
     def set_parent(self, parent_id: str) -> None:
+        if not isinstance(parent_id, str):
+            raise ValueError(
+                f"`parent_id` must be of type `str`, received {type(parent_id)}."
+            )
         self.parent = parent_id
-        self.tree_logger.update_tree(self.id, self.parent, self.children)
+        self.tree_logger._update_tree(self.id, self.parent, self.children)
 
-    # TODO: we need to do type checking on these inputs, so that we do not crash the thread
     def add_tags(self, tags: List[str]) -> None:
+        if not isinstance(tags, list):
+            raise ValueError(f"`tags` must be of type `list`, received {type(tags)}.")
+        for tag in tags:
+            if not isinstance(tag, str):
+                raise ValueError(
+                    f"Each entry of `tags` must be of type `str`, received {type(tag)}."
+                )
         self.tags.extend(tags)
-        self.tree_logger.update_tags(self.id, self.tags)
+        self.tree_logger._update_tags(self.id, self.tags)
 
-    # TODO: we need to do type checking on these inputs, so that we do not crash the thread
     def add_metadata(self, metadata: Dict[str, str | int | float | bool]) -> None:
+        if not isinstance(metadata, dict):
+            raise ValueError(
+                f"`metadata` must be of type `dict`, received {type(metadata)}"
+            )
+        for key, value in metadata.items():
+            if not isinstance(key, str):
+                raise ValueError(
+                    f"`metadata` must have keys of type `str`, received {type(key)}"
+                )
+            if not isinstance(value, (str, int, float, bool)):
+                raise ValueError(
+                    f"`metadata` must have values of type `str`, `int`, `float`, or `bool`, received {type(value)}"
+                )
         self.metadata.update(metadata)
-        self.tree_logger.update_metadata(self.id, self.metadata)
+        self.tree_logger._update_metadata(self.id, self.metadata)
