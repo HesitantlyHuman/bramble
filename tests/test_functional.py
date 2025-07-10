@@ -3,9 +3,11 @@ import pytest
 
 from unittest.mock import AsyncMock
 
-from bramble.functional import log, apply, branch, stringify_function_call
+from bramble.wrapper import branch
+from bramble.utils import stringify_function_call
+from bramble.contextual import log, apply
 from bramble.backend import BrambleWriter
-from bramble.logger import TreeLogger
+from bramble.loggers import TreeLogger
 from bramble.logs import MessageType
 
 

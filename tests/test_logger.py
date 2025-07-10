@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from bramble.logger import TreeLogger, LogBranch
+from bramble.loggers import TreeLogger, LogBranch
 from bramble.backend import BrambleWriter
 from bramble.logs import MessageType
 
@@ -106,7 +106,7 @@ def test_add_metadata_invalid(bad_metadata, mock_backend):
 
 
 def test_context_sets_and_clears_branch_context(mock_backend):
-    from bramble.context import _CURRENT_BRANCH_IDS, _LIVE_BRANCHES
+    from bramble.contextual import _CURRENT_BRANCH_IDS, _LIVE_BRANCHES
 
     logger = TreeLogger(logging_backend=mock_backend)
     with logger as ctx_logger:

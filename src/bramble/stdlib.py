@@ -1,10 +1,16 @@
 import logging
 
-from bramble.functional import log
 from bramble.logs import MessageType
 
 
 class BrambleHandler(logging.Handler):
+    def __init__(self, level=0):
+        # Cannot import at top of file because of circular imports
+        from bramble.contextual import log
+
+        super().__init__(level)
+        self.log_fn = log
+
     def emit(self, record):
         try:
             metadata = {
@@ -24,7 +30,7 @@ class BrambleHandler(logging.Handler):
                 if not isinstance(value, (str, int, float, bool)):
                     metadata[key] = str(value)
 
-            log(
+            self.log_fn(
                 f"[{record.levelname}] {record.name}: {record.getMessage()}",
                 MessageType.USER if record.levelno < 30 else MessageType.ERROR,
                 metadata,

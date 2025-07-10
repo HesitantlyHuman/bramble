@@ -1,5 +1,6 @@
-from typing import Any, Dict, List
+from typing import Set, Dict, List
 
+import contextvars
 import threading
 import datetime
 import asyncio
@@ -7,13 +8,20 @@ import queue
 import uuid
 import time
 
-from bramble.context import _LIVE_BRANCHES, _CURRENT_BRANCH_IDS
 from bramble.utils import validate_log_call
 from bramble.backend import BrambleWriter
 from bramble.stdlib import hook_logging
 from bramble.logs import (
     MessageType,
     LogEntry,
+)
+
+_LIVE_BRANCHES: Dict[str, "LogBranch"] = {}
+_CURRENT_BRANCH_IDS: contextvars.ContextVar[Set[str]] = contextvars.ContextVar(
+    "_CURRENT_BRANCH_IDS", default=set()
+)
+_ENABLED: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_ENABLED", default=True
 )
 
 
@@ -217,6 +225,9 @@ class TreeLogger:
             entry_metadata=entry_metadata,
         )
 
+        if not _ENABLED.get():
+            return
+
         timestamp = datetime.datetime.now().timestamp()
         log_entry = LogEntry(
             message=message,
@@ -407,3 +418,33 @@ class LogBranch:
                 )
         self.metadata.update(metadata)
         self.tree_logger._update_metadata(self.id, self.metadata)
+
+    def __repr__(self):
+        return f"LogBranch(id={self.id}, name={self.name}, parent={self.parent}, children={self.children}, tags={self.tags}, metadata={self.metadata})"
+
+    def __enter__(self):
+        self._logging_context = _LoggingContext(new_branches=[self])
+        self._logging_context.__enter__()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._logging_context.__exit__(exc_type, exc_value, traceback)
+
+
+class _LoggingContext:
+    _prev_logger_ids: Set[str]
+    _new_branches: List[LogBranch]
+
+    def __init__(self, new_branches: List[LogBranch]):
+        self._new_branches = new_branches
+
+    def __enter__(self):
+        self._prev_logger_ids = _CURRENT_BRANCH_IDS.get()
+
+        new_logger_ids = set()
+        for new_branch in self._new_branches:
+            _LIVE_BRANCHES[new_branch.id] = new_branch
+            new_logger_ids.add(new_branch.id)
+        _CURRENT_BRANCH_IDS.set(new_logger_ids)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _CURRENT_BRANCH_IDS.set(self._prev_logger_ids)

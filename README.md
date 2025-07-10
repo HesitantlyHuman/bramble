@@ -1,3 +1,5 @@
+TODO: direct vs contextual
+
 # bramble
 Tree-based logging for python.
 
