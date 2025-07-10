@@ -155,9 +155,9 @@ Options:
 Once you have launched the UI, you can access it on your local machine via the
 port that you provided, in a browser of your choice.
 
-![Search View Example](docs\search.png)
+![Search View Example](docs/search.png)
 
-![Log View Example](docs\logs.png)
+![Log View Example](docs/logs.png)
 
 ## Best Practices
 ### Message Types
