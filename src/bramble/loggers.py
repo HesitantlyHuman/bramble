@@ -8,7 +8,7 @@ import queue
 import uuid
 import time
 
-from bramble.utils import validate_log_call
+from bramble.utils import _validate_log_call
 from bramble.backend import BrambleWriter
 from bramble.stdlib import hook_logging
 from bramble.logs import (
@@ -219,7 +219,7 @@ class TreeLogger:
                 strings, or the values of `entry_metadata` are not `str`, `int`,
                 `float`, or `bool`.
         """
-        message, message_type, entry_metadata = validate_log_call(
+        message, message_type, entry_metadata = _validate_log_call(
             message=message,
             message_type=message_type,
             entry_metadata=entry_metadata,
@@ -307,6 +307,16 @@ class LogBranch:
     tags: List[str]
     metadata: Dict[str, str | int | float | bool]
 
+    slots = (
+        "id",
+        "name",
+        "parent",
+        "children",
+        "tags",
+        "metadata",
+        "tree_logger",
+    )
+
     def __init__(self, name: str, tree_logger: TreeLogger, id: str = None):
         self.name = name
         self.parent = None
@@ -345,6 +355,7 @@ class LogBranch:
             entry_metadata=entry_metadata,
         )
 
+    # TODO: typecheck this
     def branch(self, name: str) -> "LogBranch":
         """Create a new branch from the current.
 
@@ -434,17 +445,16 @@ class _LoggingContext:
     _prev_logger_ids: Set[str]
     _new_branches: List[LogBranch]
 
+    __slots__ = ("_prev_logger_ids", "_new_branches")
+
     def __init__(self, new_branches: List[LogBranch]):
         self._new_branches = new_branches
 
     def __enter__(self):
         self._prev_logger_ids = _CURRENT_BRANCH_IDS.get()
 
-        new_logger_ids = set()
-        for new_branch in self._new_branches:
-            _LIVE_BRANCHES[new_branch.id] = new_branch
-            new_logger_ids.add(new_branch.id)
-        _CURRENT_BRANCH_IDS.set(new_logger_ids)
+        _LIVE_BRANCHES.update({branch.id: branch for branch in self._new_branches})
+        _CURRENT_BRANCH_IDS.set({branch.id for branch in self._new_branches})
 
     def __exit__(self, exc_type, exc_value, traceback):
         _CURRENT_BRANCH_IDS.set(self._prev_logger_ids)

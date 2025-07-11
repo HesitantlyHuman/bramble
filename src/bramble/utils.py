@@ -5,7 +5,7 @@ import traceback
 from bramble.logs import MessageType
 
 
-def stringify_function_call(func, args: list, kwargs: dict):
+def _stringify_function_call(func, args: list, kwargs: dict):
     function_call = f"{func.__name__}("
     for arg in args:
         try:
@@ -21,7 +21,7 @@ def stringify_function_call(func, args: list, kwargs: dict):
     return function_call
 
 
-def validate_log_call(
+def _validate_log_call(
     message: str | Exception,
     message_type: MessageType | str = MessageType.USER,
     entry_metadata: Dict[str, str | int | float | bool] | None = None,
@@ -68,7 +68,7 @@ def validate_log_call(
     return message, message_type, entry_metadata
 
 
-def validate_tags_and_metadata(
+def _validate_tags_and_metadata(
     *args, tags: List[str] | None, metadata: Dict[str, str | int | float | bool] | None
 ) -> Tuple[List[str] | None, Dict[str, str | int | float | bool] | None]:
     """Validates a bramble tags and metadata for functional API.

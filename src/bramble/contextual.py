@@ -3,9 +3,8 @@ from typing import Dict, List, ContextManager
 from contextlib import contextmanager, nullcontext
 
 from bramble.utils import (
-    stringify_function_call,
-    validate_log_call,
-    validate_tags_and_metadata,
+    _validate_log_call,
+    _validate_tags_and_metadata,
 )
 from bramble.logs import MessageType
 from bramble.loggers import (
@@ -48,7 +47,7 @@ def log(
     """
     # Ensure that we provide proper errors to the user's logging calls, even if
     # there are currently no loggers in context.
-    message, message_type, entry_metadata = validate_log_call(
+    message, message_type, entry_metadata = _validate_log_call(
         message=message,
         message_type=message_type,
         entry_metadata=entry_metadata,
@@ -87,7 +86,11 @@ def apply(
 ):
     """Add tags or metadata to active `bramble` branches.
 
-    Will update the tags or metadata to any branches currently in context. Each branch will receive identical updates. If multiple lists of tags or dictionaries of metadata are supplied, they will be combined. All tags which are present in any list will be applied. Later dictionaries will be used to update earlier dictionaries. For example:
+    Will update the tags or metadata to any branches currently in context. Each
+    branch will receive identical updates. If multiple lists of tags or
+    dictionaries of metadata are supplied, they will be combined. All tags which
+    are present in any list will be applied. Later dictionaries will be used to
+    update earlier dictionaries. For example:
 
     ```
     apply(["a", "b"], ["b", "c"], {"a": 1, "b": 2}, {"b": 3})
@@ -101,14 +104,16 @@ def apply(
 
     Args:
         *args: Arbitrary list of lists or dictionaries.
-        tags (List[str] | None, optional): A list of tags to add to the current branches. Defaults to `None`.
-        metadata (Dict[str, str | int | float | bool] | None, optional): Metadata to add to the current branches, defaults to `None`
+        tags (List[str] | None, optional): A list of tags to add to the current
+            branches. Defaults to `None`.
+        metadata (Dict[str, str | int | float | bool] | None, optional):
+            Metadata to add to the current branches, defaults to `None`
     """
 
     if len(args) == 0 and tags is None and metadata is None:
         raise ValueError(f"Must provide at least one of `tags` or `metadata`.")
 
-    tags, metadata = validate_tags_and_metadata(
+    tags, metadata = _validate_tags_and_metadata(
         *args,
         tags=tags,
         metadata=metadata,
@@ -122,10 +127,33 @@ def apply(
     )
 
 
-# TODO: better errors
-# TODO: docstrings
-# TODO: add to README.md
-def context(*args: List[LogBranch] | None) -> List[LogBranch] | None:
+def context(*args: List[LogBranch] | None) -> List[LogBranch]:
+    """Retrieve or set current `bramble` context.
+
+    Either gets all branches from the current context, or if used as a context
+    manager, sets provided branches as the current context.
+
+    If no arguments are provided `context` will return the current context. If
+    arguments are provided, they are expected to be either `LogBranch`s, or a
+    list of `LogBranch`s.
+
+    Example:
+    ```
+    current_context = bramble.context()
+    new_context = [branch.branch("new") for branch in current_context]
+
+    with bramble.context(new_context):
+        ...
+    ```
+
+    Args:
+        *args: Either one list of `LogBranch`s, or many `LogBranch`s, optional.
+
+    Returns:
+        (List[LogBranch] | ContextManager[None]): Either returns the current
+            context, or a context manager in which the provided branches are the
+            current context.
+    """
     match len(args):
         case 0:
             branches = []
@@ -141,14 +169,24 @@ def context(*args: List[LogBranch] | None) -> List[LogBranch] | None:
                 parameter = [parameter]
 
             if not isinstance(parameter, list):
-                raise ValueError
+                raise ValueError(
+                    f"Arguments must either be of type `list` or `LogBranch`, received {type(parameter)}"
+                )
+
+            for element in parameter:
+                if not isinstance(element, LogBranch):
+                    raise ValueError(
+                        f"All elements of list arguments must be of type `LogBranch`, received {type(element)}"
+                    )
         case _:
             parameter = []
             for arg in args:
                 if isinstance(arg, LogBranch):
                     parameter.append(arg)
                 else:
-                    raise ValueError
+                    raise ValueError(
+                        f"If multiple arguments are provided, all arguments must be of type `LogBranch`, received {type(arg)}"
+                    )
 
     if len(parameter) == 0:
         return nullcontext()
@@ -156,15 +194,30 @@ def context(*args: List[LogBranch] | None) -> List[LogBranch] | None:
     return _LoggingContext(parameter)
 
 
-# TODO: errors
-# TODO: docstring
-# TODO: maybe this should allow tags and metadata inputs too
 def fork(
     name: str,
     tags: List[str] | None = None,
     metadata: Dict[str, str | int | float | bool] | None = None,
 ) -> ContextManager[None]:
-    tags, metadata = validate_tags_and_metadata(tags=tags, metadata=metadata)
+    """Will fork the current `bramble` context.
+
+    Creates new branches of any branches in the current context, using the
+    provided name, and then sets the current context to those new branches,
+    until the end of `fork`'s context. For use only as a context manager, if
+    fork is not used as a context, then it will have no effect, other than
+    creating new branches.
+
+    Args:
+        name (str): The name of this new context / branch.
+        tags (List[str] | None, optional): A list of tags to add to the current
+            branches. Defaults to `None`.
+        metadata (Dict[str, str | int | float | bool] | None, optional):
+            Metadata to add to the current branches, defaults to `None`
+    """
+    if not isinstance(name, str):
+        raise ValueError(f"`name` must be of type `str`, received {type(name)}")
+
+    tags, metadata = _validate_tags_and_metadata(tags=tags, metadata=metadata)
 
     current_context = context()
 
@@ -177,35 +230,24 @@ def fork(
     return context(next_context)
 
 
-# TODO: document that only the logging is disabled
-# Should this also disable everything else? Like if some code is trying to
-# make branches and stuff?
 @contextmanager
 def disable() -> ContextManager[None]:  # type: ignore
+    """Disables `bramble` logging.
+
+    Will disable any `bramble` log calls from being run, until either
+    `bramble.enable` is called, or the disable context ends. Can be used as
+    either a single command, or as a context manager. Only the logging is
+    disabled, all other `bramble` features, like creating branches, managing
+    parents and children, and tracking logging contexts, will still function.
+    """
     _ENABLED.set(False)
     yield
     _ENABLED.set(True)
 
 
 def enable() -> None:
+    """Enables `bramble` logging.
+
+    Will enable `bramble` log calls. For use after a `bramble.disable` call.
+    """
     _ENABLED.set(True)
-
-
-if __name__ == "__main__":
-    from bramble.backends import FileWriter
-    from bramble.loggers import TreeLogger
-
-    logging_backend = FileWriter("test_context")
-    with TreeLogger(logging_backend):
-        current_context = context()
-        print(current_context)
-
-        with fork("inside"):
-            context_inside = context()
-            print(context_inside)
-
-        with disable():
-            pass
-
-        context_outside = context()
-        print(context_outside)

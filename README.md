@@ -1,5 +1,3 @@
-TODO: direct vs contextual
-
 # bramble
 Tree-based logging for python.
 
@@ -9,6 +7,25 @@ This way, you can:
 - Follow the logic of your program (async, or otherwise)
 - Debug concurrent tasks
 - Understand how a final result was composed
+
+
+## Installing
+To install with pip
+```shell
+pip install bramble
+```
+
+#### Extras
+If you want to use `bramble`'s Streamlit UI to view the logs that you
+create, you should install `bramble` with the `ui` extras.
+```shell
+pip install bramble[ui]
+```
+
+Some backends will also require extras, such as redis.
+```shell
+pip install bramble[redis]
+```
 
 ## Basic Usage
 ### Creating a Logger
@@ -67,6 +84,13 @@ with bramble.TreeLogger(logging_backend):
 
 Each call to a decorated function will result in a unique log branch, and any existing log branches will receive a short message linking to the called function.
 
+If you do not want to branch on a function boundary, or need more granular control, you can also use context based branching with `bramble.fork`.
+
+```python
+with bramble.fork("branch_name"):
+    ...
+```
+
 #### Manual Branching
 If you find yourself needing to manage things by hand, simply branch any existing `LogBranch` object. Each branch must be provided a name.
 
@@ -115,23 +139,37 @@ branch.add_metadata({"key": 234})
 For a complete example of `bramble` in use, please refer to
 [`demo.py`](demo.py).
 
-## Installing
-To install with pip
-```shell
-pip install bramble
+## Advanced Use Cases
+
+### Getting and Setting Context
+If you need to manipulate the current logging context directly, you may use `bramble.context`. If you do not supply any arguments, `bramble.context` will provide all of the `LogBranch`s in the current context. If you provide `bramble.context` with `LogBranch`s, then it will create a context manager. Inside this context manager the current logging context will be the supplied branches.
+
+```python
+current_context = bramble.context()
+next_context = [branch.branch("name") for branch in current_context]
+
+with bramble.context(next_context):
+    ...
+
+with bramble.context(next_context[0]):
+    ...
+
+with bramble.context(next_context[0], next_context[1]):
+    ...
 ```
 
-#### Extras
-If you want to use `bramble`'s Streamlit UI to view the logs that you
-create, you should install `bramble` with the `ui` extras.
-```shell
-pip install bramble[ui]
+### Disabling Logging
+If you want to disable `bramble` logging within an active logging context, simply use `bramble.disable`. `bramble.disable` functions both as a standard call, or as a context. If you do not use `bramble.disable` as a context, then simply use `bramble.enable` to reenable logging.
+
+```python
+bramble.disable()
+bramble.enable()
+
+with bramble.disable():
+    ...
 ```
 
-Some backends will also require extras, such as redis.
-```shell
-pip install bramble[redis]
-```
+Note that only logging is disabled this way. Branches will continue to be created, and the appropriate metadata will still be saved to the logging backend.
 
 ## UI
 If you install `bramble` with the `ui` extras, `bramble` provides access to a
