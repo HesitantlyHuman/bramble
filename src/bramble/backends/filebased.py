@@ -4,7 +4,7 @@ import asyncio
 import json
 import os
 
-from bramble.backend import BrambleWriter, BrambleReader
+from bramble.backends.base import BrambleWriter, BrambleReader
 from bramble.logs import LogEntry, BranchData
 
 

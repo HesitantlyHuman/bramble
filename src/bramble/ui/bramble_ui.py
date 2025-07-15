@@ -2,6 +2,9 @@ import sys
 from importlib import resources
 import click
 
+import streamlit
+import streamlit.web.cli as stcli
+
 
 @click.group()
 def cli():
@@ -76,7 +79,6 @@ def run(port, backend, redis_host, redis_port, filepath):
     ] + backend_args
 
     # Run streamlit
-    import streamlit.web.cli as stcli
 
     sys.exit(stcli.main())
 

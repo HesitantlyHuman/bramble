@@ -6,7 +6,7 @@ import asyncio
 
 from bramble.logs import MessageType
 from bramble.backends import FileReader
-from bramble.backend import BrambleReader
+from bramble.backends.base import BrambleReader
 
 
 @st.cache_data

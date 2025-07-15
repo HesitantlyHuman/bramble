@@ -3,7 +3,7 @@ from typing import Dict, List, Self
 from redis import asyncio as aioredis
 import msgpack
 
-from bramble.backend import BrambleWriter, BrambleReader
+from bramble.backends.base import BrambleWriter, BrambleReader
 from bramble.logs import LogEntry
 
 REDIS_PREFIX = "bramble:logging:"

@@ -9,7 +9,7 @@ import uuid
 import time
 
 from bramble.utils import _validate_log_call
-from bramble.backend import BrambleWriter
+from bramble.backends.base import BrambleWriter
 from bramble.stdlib import hook_logging
 from bramble.logs import (
     MessageType,
