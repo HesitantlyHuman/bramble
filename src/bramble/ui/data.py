@@ -11,12 +11,20 @@ from bramble.backends.base import BrambleReader
 
 @st.cache_data
 def load_branches_and_tags():
-    if not "backend" in st.session_state:
-        return [], []
-    else:
+    def _load_branches_and_tags():
         backend: BrambleReader = st.session_state.backend
-        all_branch_ids = asyncio.run(backend.async_get_branch_ids())
-        all_branch_data = asyncio.run(backend.async_get_branches(all_branch_ids))
+        if isinstance(backend, tuple):
+            from bramble.backends import RedisReader
+
+            host, port = backend
+            backend = RedisReader.from_socket(host, port)
+
+        async def _load():
+            all_branch_ids = await backend.async_get_branch_ids()
+            all_branch_data = await backend.async_get_branches(all_branch_ids)
+            return all_branch_data
+
+        all_branch_data = asyncio.run(_load())
 
         branches = []
         tags = set()
@@ -53,13 +61,22 @@ def load_branches_and_tags():
         branches = pd.DataFrame(branches)
         return branches, tags
 
+    if not "backend" in st.session_state:
+        return [], []
+    else:
+        return _load_branches_and_tags()
+
 
 @st.cache_data
 def load_branch_data(id: str):
-    if not "backend" in st.session_state:
-        "", {}, []
-    else:
+    def _load_branch_data(id: str):
         backend: BrambleReader = st.session_state.backend
+        if isinstance(backend, tuple):
+            from bramble.backends import RedisReader
+
+            host, port = backend
+            backend = RedisReader.from_socket(host, port)
+
         branch_data = asyncio.run(backend.async_get_branches([id]))
         branch_data = branch_data[id]
 
@@ -98,6 +115,11 @@ def load_branch_data(id: str):
             messages,
         )
 
+    if not "backend" in st.session_state:
+        "", {}, []
+    else:
+        return _load_branch_data(id)
+
 
 def start_file_backend(path: str):
     if not "backend" in st.session_state:
@@ -111,7 +133,7 @@ def start_redis_backend(host: str, port: int):
     from bramble.backends import RedisReader
 
     if not "backend" in st.session_state:
-        st.session_state.backend = RedisReader.from_socket(host=host, port=port)
+        st.session_state.backend = (host, port)
 
         load_branch_data.clear()
         load_branches_and_tags.clear()

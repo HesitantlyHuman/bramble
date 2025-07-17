@@ -62,8 +62,8 @@ def sync_inside():
     logging.debug("You should really fix this")
 
 
-logging_writer = bramble.backends.FileWriter("test")
-
+# logging_writer = bramble.backends.FileWriter("test")
+logging_writer = bramble.backends.RedisWriter.from_socket("127.0.0.1", "6379")
 with bramble.TreeLogger(logging_backend=logging_writer):
     entry_function()
 
