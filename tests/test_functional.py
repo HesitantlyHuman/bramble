@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 from bramble.wrapper import branch
 from bramble.utils import stringify_function_call
 from bramble.contextual import log, apply
-from bramble.backend import BrambleWriter
+from bramble.backends.base import BrambleWriter
 from bramble.loggers import TreeLogger
 from bramble.logs import MessageType
 

@@ -1,7 +1,7 @@
-from bramble.backends.filebased import FileReader, FileWriter
+from bramble.backends.file_backend import FileReader, FileWriter
 
 try:
-    from bramble.backends.redis import RedisReader, RedisWriter
+    from bramble.backends.redis_backend import RedisReader, RedisWriter
 except ImportError:
 
     class _RedisError:

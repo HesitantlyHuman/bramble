@@ -24,7 +24,7 @@ def cli():
 )
 @click.option(
     "--redis-host",
-    default="localhost",
+    default="127.0.0.1",
     help="Redis host (if using redis backend).",
 )
 @click.option(
