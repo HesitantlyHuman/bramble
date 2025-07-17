@@ -19,7 +19,7 @@ def make_log_record(level, msg="test msg"):
     )
 
 
-@patch("bramble.stdlib.log")
+@patch("bramble.contextual.log")
 def test_emit_user_level_logs(log_mock):
     handler = BrambleHandler()
     record = make_log_record(logging.INFO, "info level message")
@@ -34,7 +34,7 @@ def test_emit_user_level_logs(log_mock):
     assert metadata["logger"] == "test_logger"
 
 
-@patch("bramble.stdlib.log")
+@patch("bramble.contextual.log")
 def test_emit_error_level_logs(log_mock):
     handler = BrambleHandler()
     record = make_log_record(logging.ERROR, "uh oh")
@@ -45,7 +45,7 @@ def test_emit_error_level_logs(log_mock):
     assert msg_type == MessageType.ERROR
 
 
-@patch("bramble.stdlib.log")
+@patch("bramble.contextual.log")
 def test_emit_metadata_casting(log_mock):
     handler = BrambleHandler()
     record = make_log_record(logging.INFO)
@@ -70,7 +70,7 @@ def test_hook_logging_adds_handler():
     assert len(root_logger.handlers) >= original_handler_count + 1
 
 
-@patch("bramble.stdlib.log", side_effect=Exception("fail"))
+@patch("bramble.contextual.log", side_effect=Exception("fail"))
 def test_emit_handles_exceptions_gracefully(log_mock):
     handler = BrambleHandler()
     record = make_log_record(logging.INFO)

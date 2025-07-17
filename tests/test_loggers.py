@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from bramble.loggers import TreeLogger, LogBranch
-from bramble.backend import BrambleWriter
+from bramble.backends.base import BrambleWriter
 from bramble.logs import MessageType
 
 
