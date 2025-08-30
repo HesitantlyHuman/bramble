@@ -83,7 +83,7 @@ class ChunkCompressor:
 
 if __name__ == "__main__":
     example_entry = LogEntry(
-        "Here is a message that we want to have saved and compressed, because otherwise our logs become too large and unweildy!",
+        """Here is a message that we want to have saved and compressed, because otherwise our logs become too large and unweildy!""",
         112340.2345,
         MessageType.USER,
         entry_metadata={
