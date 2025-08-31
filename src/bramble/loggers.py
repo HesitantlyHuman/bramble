@@ -5,10 +5,9 @@ import threading
 import datetime
 import asyncio
 import queue
-import uuid
 import time
 
-from bramble.utils import _validate_log_call
+from bramble.utils import _validate_log_call, _generate_id
 from bramble.backends.base import BrambleWriter
 from bramble.stdlib import hook_logging
 from bramble.logs import (
@@ -327,7 +326,7 @@ class LogBranch:
         self.tree_logger = tree_logger
 
         if id is None:
-            id = str(uuid.uuid4().hex)[:24]
+            id = _generate_id()
         self.id = id
 
         self.tree_logger._update_metadata(self.id, self.metadata)

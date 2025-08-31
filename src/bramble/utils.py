@@ -1,8 +1,13 @@
 from typing import Dict, Tuple, List
 
+import uuid
 import traceback
 
 from bramble.logs import MessageType
+
+
+def _generate_id() -> str:
+    return str(uuid.uuid4().hex)[:24]
 
 
 def _stringify_function_call(func, args: list, kwargs: dict):

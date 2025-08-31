@@ -1,8 +1,8 @@
 ## Compression approach:
 
-Put the logs into chunks. Have the "compression" layer of the bramble chain hold some number of brotli compressors at once. Each compressor will be kept going until the its output reaches a set chunksize. When we receive messages, we will direct them to the assigned compressor for that particular branch. We will attempt to assign branches to chunks which already have a branch of that function.
+Put the logs into chunks. Have the "compression" layer of the bramble chain hold some number of brotli compressors at once. Each compressor will be kept going until the its output reaches a set chunk size. When we receive messages, we will direct them to the assigned compressor for that particular branch. We will attempt to assign branches to chunks which already have a branch of that function.
 
-Once a compressor's output has reached a set threshold, then we will finish the compression, and output a data chunk to the backend writer. Independently of chunk writing, we will be updating branch metadata as we go, including chunk IDs, so that we can locate any branch in just 2 steps.
+Once a compressor's output has reached a set threshold, then we will finish the compression, and output a data chunk to the backend writer. Independently of chunk writing, we will be updating branch metadata as we go, including chunk IDs, so that we can locate any branch in just n+1 steps, where n is the number of chunks that branch has been written to (depends on the chunk size).
 
 When a chunk finishes, we will create a new compressor and chunk to take its place. Each chunk will have a uuid so that we avoid collisions in the database.
 
