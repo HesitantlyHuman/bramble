@@ -27,8 +27,6 @@ class CompressionWriter:
                 lgwin=24,
                 lgblock=0,
             ),
-            set(),
-            set(),
             b"",
             None,
         )
@@ -43,37 +41,29 @@ class CompressionWriter:
             self.data += compressed_branch
             self._previous_branch_id = branch_id
 
-        compressed_message = (
-            self.compressor.process(entry.message.encode()) + self.compressor.flush()
-        )
-        self.data += len(compressed_message).to_bytes(ENCODING_LENGTH_SIZE, "big")
-        self.data += compressed_message
-
-        compressed_timestamp = (
-            self.compressor.process(str(entry.timestamp).encode())
-            + self.compressor.flush()
-        )
-        self.data += len(compressed_timestamp).to_bytes(ENCODING_LENGTH_SIZE, "big")
-        self.data += compressed_timestamp
-
         match entry.message_type:
             case MessageType.SYSTEM:
-                self.data += (0).to_bytes(1, "big")
+                encoded_message_type = 0
             case MessageType.USER:
-                self.data += (1).to_bytes(1, "big")
+                encoded_message_type = 1
             case MessageType.ERROR:
-                self.data += (1).to_bytes(1, "big")
+                encoded_message_type = 2
 
-        if entry.entry_metadata is None:
-            self.data += (0).to_bytes(ENCODING_LENGTH_SIZE, "big")
-            return
-
-        formatted_metadata = msgpack.packb(entry.entry_metadata)
-        compressed_metadata = (
-            self.compressor.process(formatted_metadata) + self.compressor.flush()
+        compressed_entry = (
+            self.compressor.process(
+                msgpack.packb(
+                    (
+                        entry.message,
+                        entry.timestamp,
+                        encoded_message_type,
+                        entry.entry_metadata,
+                    )
+                )
+            )
+            + self.compressor.flush()
         )
-        self.data += len(compressed_metadata).to_bytes(ENCODING_LENGTH_SIZE, "big")
-        self.data += compressed_metadata
+        self.data += len(compressed_entry).to_bytes(ENCODING_LENGTH_SIZE, "big")
+        self.data += compressed_entry
 
     def len(self) -> int:
         return len(self.data)
@@ -113,37 +103,26 @@ class CompressionReader:
             branch_id = self.decompressor.process(branch_id_compressed).decode()
             self._previous_branch_id = branch_id
 
-            # Reset the message length
-            message_length = int.from_bytes(self._consume(ENCODING_LENGTH_SIZE), "big")
+            # Get the next value for the entry length
+            entry_length = int.from_bytes(self._consume(ENCODING_LENGTH_SIZE), "big")
         else:
             branch_id = self._previous_branch_id
-            message_length = initial_value
+            entry_length = initial_value
 
-        # Read the message
-        message_compressed = self._consume(message_length)
-        message = self.decompressor.process(message_compressed).decode()
+        # Read the entry
+        compressed_entry = self._consume(entry_length)
+        uncompressed_entry = self.decompressor.process(compressed_entry)
+        (message, timestamp, encoded_message_type, metadata) = msgpack.loads(
+            uncompressed_entry
+        )
 
-        # Read the timestamp
-        timestamp_length = int.from_bytes(self._consume(ENCODING_LENGTH_SIZE), "big")
-        timestamp_compressed = self._consume(timestamp_length)
-        timestamp = float(self.decompressor.process(timestamp_compressed).decode())
-
-        # Read the message type
-        match int.from_bytes(self._consume(1), "big"):
+        match encoded_message_type:
             case 0:
                 message_type = MessageType.SYSTEM
             case 1:
                 message_type = MessageType.USER
             case 2:
                 message_type = MessageType.ERROR
-
-        # Read the metadata
-        metadata_length = int.from_bytes(self._consume(ENCODING_LENGTH_SIZE), "big")
-        if metadata_length == 0:
-            metadata = None
-        else:
-            compressed_metadata = self._consume(metadata_length)
-            metadata = msgpack.loads(self.decompressor.process(compressed_metadata))
 
         # Return our result
         return (
@@ -243,24 +222,24 @@ if __name__ == "__main__":
     id = _generate_id()
     print(id)
     l = 0
-    writer.add(id, "", example_entry)
+    writer.add(id, example_entry)
     print(writer.len() - l)
     l = writer.len()
-    writer.add(id, "", example_entry)
+    writer.add(id, example_entry)
     print(writer.len() - l)
     l = writer.len()
-    writer.add(id, "", example_entry)
+    writer.add(id, example_entry)
     print(writer.len() - l)
     l = writer.len()
-    writer.add(id, "", example_entry)
+    writer.add(id, example_entry)
     print(writer.len() - l)
     l = writer.len()
     id = _generate_id()
     print(id)
-    writer.add(id, "", example_entry)
+    writer.add(id, example_entry)
     print(writer.len() - l)
     l = writer.len()
-    writer.add(id, "", example_entry)
+    writer.add(id, example_entry)
     print(writer.len() - l)
     l = writer.len()
 

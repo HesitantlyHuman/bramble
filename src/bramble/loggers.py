@@ -195,6 +195,7 @@ class TreeLogger:
     def log(
         self,
         branch_id: str,
+        branch_name: str,
         message: str | Exception,
         message_type: MessageType | str = MessageType.USER,
         entry_metadata: Dict[str, str | int | float | bool] | None = None,
@@ -234,7 +235,7 @@ class TreeLogger:
             message_type=message_type,
             entry_metadata=entry_metadata,
         )
-        self._tasks.put((0, branch_id, log_entry))
+        self._tasks.put((0, branch_id, branch_name, log_entry))
 
     def _update_tree(self, branch_id: str, parent: str, children: List[str]) -> None:
         self._tasks.put((1, branch_id, parent, children))

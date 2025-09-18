@@ -3,7 +3,8 @@ from typing import Dict, List, Tuple
 from bramble.logs import LogEntry, BranchData
 
 
-class BrambleWriter:
+# TODO: create a `BrambleBackend` class to replace this
+class BrambleBackend:
     """Writing backend interface for `bramble` logging.
 
     Users who wish to extend the capabilities of bramble and use different
