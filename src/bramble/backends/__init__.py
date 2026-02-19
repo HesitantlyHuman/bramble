@@ -1,5 +1,4 @@
 from bramble.backends.file_backend import FileReader, FileWriter
-from bramble.backends.base import BrambleBackend
 
 try:
     from bramble.backends.redis_backend import RedisReader, RedisWriter

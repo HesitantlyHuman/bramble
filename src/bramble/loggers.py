@@ -64,9 +64,7 @@ class TreeLogger:
 
     def run(self):
         async def _run():
-            log_tasks, tree_tasks, meta_tasks, tag_tasks = (
-                None,
-                None,
+            log_tasks, meta_tasks = (
                 None,
                 None,
             )
@@ -78,7 +76,7 @@ class TreeLogger:
                     [0]
                     + [
                         len(item)
-                        for item in [log_tasks, tree_tasks, meta_tasks, tag_tasks]
+                        for item in [log_tasks, meta_tasks]
                         if item is not None
                     ]
                 )
@@ -109,10 +107,14 @@ class TreeLogger:
                         case 1:
                             _, branch_id, parent, children = task
 
-                            if not tree_tasks:
-                                tree_tasks = {}
+                            if not meta_tasks:
+                                meta_tasks = {}
 
-                            tree_tasks[branch_id] = (parent, list(set(children)))
+                            if not branch_id in meta_tasks:
+                                meta_tasks[branch_id] = {}
+
+                            meta_tasks[branch_id]["parent"] = parent
+                            meta_tasks[branch_id]["children"] = list(set(children))
                         case 2:
                             _, branch_id, metadata = task
 
@@ -122,19 +124,23 @@ class TreeLogger:
                             if not branch_id in meta_tasks:
                                 meta_tasks[branch_id] = {}
 
-                            meta_tasks[branch_id].update(metadata)
+                            if not "metadata" in meta_tasks[branch_id]:
+                                meta_tasks[branch_id]["metadata"] = {}
+
+                            meta_tasks[branch_id]["metadata"].update(metadata)
                         case 3:
                             _, branch_id, tags = task
 
-                            if not tag_tasks:
-                                tag_tasks = {}
+                            if not meta_tasks:
+                                meta_tasks = {}
 
-                            if not branch_id in tag_tasks:
-                                tag_tasks[branch_id] = []
+                            if not branch_id in meta_tasks:
+                                meta_tasks[branch_id] = {}
 
-                            task_tags = set(tag_tasks[branch_id])
-                            task_tags.update(tags)
-                            tag_tasks[branch_id] = list(task_tags)
+                            if not "tags" in meta_tasks[branch_id]:
+                                meta_tasks[branch_id]["tags"] = set()
+
+                            meta_tasks[branch_id]["tags"].update(set(tags))
 
                 if (
                     time.time() > deadline
@@ -143,17 +149,14 @@ class TreeLogger:
                 ):
                     todo = []
 
+                    # TODO: Here is where we need to do something different
+                    # and insert some sort of writer
+                    # Also, we need to figure out how to add to the list of
+                    # branches, when we make a new one.
                     if log_tasks:
                         todo.append(
                             self.logging_backend.async_append_entries(
                                 entries=log_tasks,
-                            )
-                        )
-
-                    if tree_tasks:
-                        todo.append(
-                            self.logging_backend.async_update_tree(
-                                relationships=tree_tasks,
                             )
                         )
 
@@ -164,18 +167,9 @@ class TreeLogger:
                             )
                         )
 
-                    if tag_tasks:
-                        todo.append(
-                            self.logging_backend.async_add_tags(
-                                tags=tag_tasks,
-                            )
-                        )
-
                     await asyncio.gather(*todo)
 
-                    log_tasks, tree_tasks, meta_tasks, tag_tasks = (
-                        None,
-                        None,
+                    log_tasks, meta_tasks = (
                         None,
                         None,
                     )
@@ -318,6 +312,9 @@ class LogBranch:
     )
 
     def __init__(self, name: str, tree_logger: TreeLogger, id: str = None):
+        # TODO: here is where we need to do more than add metadata
+        # We need to also indicate to the tree logger that we have created
+        # a new branch, and so that branch id needs to be recorded.
         self.name = name
         self.parent = None
         self.children = []

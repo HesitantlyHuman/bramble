@@ -58,16 +58,6 @@ class BrambleWriter:
         """
         await self.bramble_backend.async_add_tags(tags=tags)
 
-    async def remove_tags(self, tags: Dict[str, List[str]]) -> None:
-        """Removes tags from tree logger branches.
-
-        If a tag does not exist, it is ignored.
-
-        Args:
-            tags (Dict[str, List[str]]): The tags to remove, keyed by branch id.
-        """
-        await self.bramble_backend.async_remove_tags(tags=tags)
-
     async def update_tree(
         self, relationships: Dict[str, Tuple[str | None, List[str]]]
     ) -> None:

@@ -16,6 +16,7 @@ from bramble.loggers import (
 )
 
 
+# TODO: Change log to use context to load the branches, so that context is the only function that deals directly in _CURRENT_BRANCH_IDS (check that this is the case, and verify that this change wont break anything)
 def log(
     message: str,
     message_type: MessageType | str = MessageType.USER,

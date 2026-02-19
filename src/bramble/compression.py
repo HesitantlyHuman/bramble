@@ -1,4 +1,4 @@
-from typing import Any, Set, Self, Tuple, Generator, Dict
+from typing import Any, Set, Self, Tuple, Generator, Dict, List
 
 from dataclasses import dataclass
 
@@ -8,37 +8,106 @@ import brotli
 import msgpack
 
 
-ENCODING_LENGTH_SIZE: int = 2
+PREFIX_SIZE: int = 2
+
+
+def _pack_compress_flush(compressor: Any, input: Any) -> bytes:
+    data = b""
+
+    match input:
+        case str():
+            packed = input.encode()
+        case _:
+            packed = msgpack.packb(input)
+
+    compressed = compressor.process(packed) + compressor.flush()
+    data += len(compressed).to_bytes(PREFIX_SIZE, "big")
+    data += compressed
+    return data
+
+
+# TODO: We probably want to also compress the master list of branch ids, since
+# that could get large.
 
 
 @dataclass
-class CompressionWriter:
+class MetadataCompressor:
     compressor: Any
-    data: bytes
 
     _previous_branch_id: str
 
     @classmethod
     def new(cls) -> Self:
-        return CompressionWriter(
+        return MetadataCompressor(
             brotli.Compressor(
                 mode=brotli.MODE_TEXT,
                 quality=11,
                 lgwin=24,
                 lgblock=0,
             ),
-            b"",
             None,
         )
 
-    def add(self, branch_id: str, entry: LogEntry):
+    def add(
+        self,
+        branch_id: str,
+        parent: str = None,
+        children: List[str] = None,
+        tags: List[str] = None,
+        metadata: Dict[str, str | int | float | bool] = None,
+    ) -> bytes:
+        data = b""
+
         if not branch_id == self._previous_branch_id:
-            self.data += (0).to_bytes(ENCODING_LENGTH_SIZE, "big")
-            compressed_branch = (
-                self.compressor.process(branch_id.encode()) + self.compressor.flush()
-            )
-            self.data += len(compressed_branch).to_bytes(ENCODING_LENGTH_SIZE, "big")
-            self.data += compressed_branch
+            data += (0).to_bytes(1, "big")
+            data += _pack_compress_flush(self.compressor, branch_id)
+            self._previous_branch_id = branch_id
+
+        if parent is not None:
+            data += (1).to_bytes(1, "big")
+            data += _pack_compress_flush(self.compressor, parent)
+
+        if children is not None and len(children) > 0:
+            children = list(set(children))
+            data += (2).to_bytes(1, "big")
+            data += _pack_compress_flush(self.compressor, children)
+
+        if tags is not None and len(tags) > 0:
+            tags = list(set(tags))
+            data += (3).to_bytes(1, "big")
+            data += _pack_compress_flush(self.compressor, tags)
+
+        if metadata is not None and len(metadata) > 0:
+            data += (4).to_bytes(1, "big")
+            data += _pack_compress_flush(self.compressor, metadata)
+
+        return data
+
+
+@dataclass
+class EntryCompressor:
+    compressor: Any
+
+    _previous_branch_id: str
+
+    @classmethod
+    def new(cls) -> Self:
+        return EntryCompressor(
+            brotli.Compressor(
+                mode=brotli.MODE_TEXT,
+                quality=11,
+                lgwin=24,
+                lgblock=0,
+            ),
+            None,
+        )
+
+    def add(self, branch_id: str, entry: LogEntry) -> bytes:
+        data = b""
+
+        if not branch_id == self._previous_branch_id:
+            data += (0).to_bytes(PREFIX_SIZE, "big")
+            data += _pack_compress_flush(self.compressor, branch_id)
             self._previous_branch_id = branch_id
 
         match entry.message_type:
@@ -49,24 +118,15 @@ class CompressionWriter:
             case MessageType.ERROR:
                 encoded_message_type = 2
 
-        compressed_entry = (
-            self.compressor.process(
-                msgpack.packb(
-                    (
-                        entry.message,
-                        entry.timestamp,
-                        encoded_message_type,
-                        entry.entry_metadata,
-                    )
-                )
+        data += _pack_compress_flush(
+            (
+                entry.message,
+                entry.timestamp,
+                encoded_message_type,
+                entry.entry_metadata,
             )
-            + self.compressor.flush()
         )
-        self.data += len(compressed_entry).to_bytes(ENCODING_LENGTH_SIZE, "big")
-        self.data += compressed_entry
-
-    def len(self) -> int:
-        return len(self.data)
+        return data
 
 
 @dataclass
@@ -89,22 +149,20 @@ class CompressionReader:
         return chunk
 
     def _read_single(self) -> Tuple[str, LogEntry]:
-        initial = self._consume(ENCODING_LENGTH_SIZE)
+        initial = self._consume(PREFIX_SIZE)
         if initial is None:
             return None
 
         initial_value = int.from_bytes(initial, "big")
         if initial_value == 0:
             # Read out the branch id, because we are getting a new one
-            branch_id_length = int.from_bytes(
-                self._consume(ENCODING_LENGTH_SIZE), "big"
-            )
+            branch_id_length = int.from_bytes(self._consume(PREFIX_SIZE), "big")
             branch_id_compressed = self._consume(branch_id_length)
             branch_id = self.decompressor.process(branch_id_compressed).decode()
             self._previous_branch_id = branch_id
 
             # Get the next value for the entry length
-            entry_length = int.from_bytes(self._consume(ENCODING_LENGTH_SIZE), "big")
+            entry_length = int.from_bytes(self._consume(PREFIX_SIZE), "big")
         else:
             branch_id = self._previous_branch_id
             entry_length = initial_value
@@ -144,6 +202,7 @@ class CompressionReader:
 
 
 class ChunkCompressor:
+    # TODO: when we do the assignments we should pop from a list, so that we ensure we are using all of our active chunks. Then when we create a new list, we order it by the current size. Or, we have a list and we get the one from the list which is smallest currently, then pop.
     def __init__(self, num_simultaneous_chunks: int = 8, chunk_size: int = 2**32):
         self.num_simultaneous_chunks = num_simultaneous_chunks
         self.compressors = [
