@@ -26,6 +26,12 @@ def _pack_compress_flush(compressor: Any, input: Any) -> bytes:
     return data
 
 
+# TODO: We should set a max on how uneven we assign the chunks. We don't want all the branches with the same name in the same chunk, if there is a ton, because then we create a big ol linked bunch that will use up a whole bunch of chunks.
+
+
+# TODO: The compression quality should be a parameter that can be set. Investigate the overhead of various qualities, to get a good default.
+# TODO: Add the compression quality as an initial value to each chunk, and have the writer set its quality using that.
+# TODO: Increase the number of concurrent chunks, since this will improve read and write metrics.
 @dataclass
 class Writer:
     compressor: Any
@@ -282,6 +288,8 @@ class EntryReader(Reader):
 
 class ChunkCompressor:
     # TODO: when we do the assignments we should pop from a list, so that we ensure we are using all of our active chunks. Then when we create a new list, we order it by the current size. Or, we have a list and we get the one from the list which is smallest currently, then pop.
+
+    # TODO: Change the chunk size default to something fucking reasonable
     def __init__(self, num_simultaneous_chunks: int = 8, chunk_size: int = 2**32):
         self.num_simultaneous_chunks = num_simultaneous_chunks
         self.compressors = [
