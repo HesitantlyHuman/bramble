@@ -6,8 +6,11 @@ import traceback
 from bramble.log_objects import MessageType
 
 
-def _generate_id() -> str:
-    return str(uuid.uuid4().hex)[:24]
+def _generate_id(prefix: str = None) -> str:
+    uuid = str(uuid.uuid4().hex)[:24]
+    if prefix:
+        uuid = prefix + "-" + uuid
+    return uuid
 
 
 def _stringify_function_call(func, args: list, kwargs: dict):

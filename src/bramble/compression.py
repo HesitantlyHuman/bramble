@@ -280,22 +280,30 @@ class EntryReader(Reader):
             next_item = self.read_next()
 
 
+# TODO: Change all internal representations of children and tags to be sets. Keep external interfaces using lists, for simplicity.
+
+
 class ChunkCompressor:
     # TODO: when we do the assignments we should pop from a list, so that we ensure we are using all of our active chunks. Then when we create a new list, we order it by the current size. Or, we have a list and we get the one from the list which is smallest currently, then pop.
     def __init__(self, num_simultaneous_chunks: int = 8, chunk_size: int = 2**32):
         self.num_simultaneous_chunks = num_simultaneous_chunks
-        self.compressors = [
-            CompressionWriter.new() for _ in range(num_simultaneous_chunks)
-        ]
+        self.entry_compressors = {
+            _generate_id("ec"): EntryWriter.new()
+            for _ in range(num_simultaneous_chunks)
+        }
+        self.metadata_compressors = {
+            _generate_id("mc"): MetadataWriter.new()
+            for _ in range(num_simultaneous_chunks)
+        }
         self.chunk_size = chunk_size
 
-        self.id_to_compressor_map: Dict[str, int] = (
-            {}
-        )  # This will need to be saved in the db
-        self.name_to_compressor_map: Dict[str, int] = {}
-        self.compressor_to_names_and_ids: Dict[int, Tuple[Set[str], Set[str]]] = {}
+        self._id_to_compressor_map: Dict[str, str] = {}
+        self._name_to_compressor_map: Dict[str, str] = {}
+        self._compressor_to_names_and_ids: Dict[int, Tuple[Set[str], Set[str]]] = {}
+        self._assignment_options: List[str] = []
 
-    def _get_or_assign_compressor(self, branch_id: str, branch_name: str) -> int:
+    # TODO: we need to assign both a metadata and an entry chunk
+    def get_or_assign_compressor(self, branch_id: str, branch_name: str) -> str:
         # First, identify if we have already assigned this branch_id
         if branch_id in self.id_to_compressor_map:
             return self.id_to_compressor_map[branch_id]
@@ -376,42 +384,42 @@ if __name__ == "__main__":
     # for branch_id, log_entry in reader.read():
     #     print(branch_id, log_entry)
 
-    writer = MetadataWriter.new()
+    # writer = MetadataWriter.new()
 
-    data = b""
-    id = _generate_id()
-    data += writer.add(
-        id,
-        "parent",
-        ["a", "b", "c"],
-        ["tag_a", "tag-b"],
-        {"key": "value", "another": 235},
-    )
-    data += writer.add(
-        id,
-        None,
-        ["d"],
-        None,
-        {"another": 244},
-    )
-    print(len(data))
-    data += writer.add(
-        _generate_id(),
-        "parent",
-        ["a", "b", "c"],
-        ["tag_a", "tag-b"],
-        {"key": "value", "another": 235},
-    )
-    print(len(data))
-    data += writer.add(
-        _generate_id(),
-        "parent",
-        ["a", "b", "c"],
-        ["tag_a", "tag-b"],
-        {"key": "value", "another": 235},
-    )
-    print(len(data))
+    # data = b""
+    # id = _generate_id()
+    # data += writer.add(
+    #     id,
+    #     "parent",
+    #     ["a", "b", "c"],
+    #     ["tag_a", "tag-b"],
+    #     {"key": "value", "another": 235},
+    # )
+    # data += writer.add(
+    #     id,
+    #     None,
+    #     ["d"],
+    #     None,
+    #     {"another": 244},
+    # )
+    # print(len(data))
+    # data += writer.add(
+    #     _generate_id(),
+    #     "parent",
+    #     ["a", "b", "c"],
+    #     ["tag_a", "tag-b"],
+    #     {"key": "value", "another": 235},
+    # )
+    # print(len(data))
+    # data += writer.add(
+    #     _generate_id(),
+    #     "parent",
+    #     ["a", "b", "c"],
+    #     ["tag_a", "tag-b"],
+    #     {"key": "value", "another": 235},
+    # )
+    # print(len(data))
 
-    reader = MetadataReader.new(data)
-    for output in reader.read():
-        print(output)
+    # reader = MetadataReader.new(data)
+    # for output in reader.read():
+    #     print(output)

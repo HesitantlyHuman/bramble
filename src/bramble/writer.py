@@ -22,6 +22,9 @@ class BrambleWriter:
             num_simultaneous_chunks=num_simultaneous_chunks, chunk_size=chunk_size
         )
 
+    async def add_branches(self, ids_and_names: List[Tuple[str, str]]) -> None:
+        """Adds new branches to the backend storage."""
+
     async def append_entries(
         self,
         entries: Dict[str, List[LogEntry]],

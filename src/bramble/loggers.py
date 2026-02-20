@@ -324,7 +324,7 @@ class LogBranch:
         self.tree_logger = tree_logger
 
         if id is None:
-            id = _generate_id()
+            id = _generate_id("b")
         self.id = id
 
         self.tree_logger._update_metadata(self.id, self.metadata)
