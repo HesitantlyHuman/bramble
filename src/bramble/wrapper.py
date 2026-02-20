@@ -8,7 +8,7 @@ from bramble.utils import (
     _validate_tags_and_metadata,
 )
 from bramble.contextual import log, fork
-from bramble.logs import MessageType
+from bramble.log_objects import MessageType
 
 # _async_branch and _sync_branch are split into two functions this way so that
 # we only call inspect.iscoroutinefunction a single time. We want the wrapper

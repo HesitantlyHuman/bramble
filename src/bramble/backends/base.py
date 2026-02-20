@@ -1,6 +1,19 @@
-from typing import Mapping, Sequence, Tuple
+from typing import Mapping, Sequence, Tuple, Generator, Protocol, runtime_checkable
 
-from bramble.logs import LogEntry, BranchData
+import io
+
+from bramble.log_objects import LogEntry, BranchData
+
+
+@runtime_checkable
+class ByteSource(Protocol):
+    def read(self, n: int = -1) -> bytes: ...
+
+
+def as_byte_source(x: bytes | bytearray | memoryview | ByteSource) -> ByteSource:
+    if isinstance(x, ByteSource):
+        return x
+    return io.BytesIO(bytes(x))
 
 
 class BrambleBackend:
@@ -19,9 +32,6 @@ class BrambleBackend:
     `async_append_entries`, but not both. `bramble` logging and the `bramble` UI
     will work as long as either is implemented.
     """
-
-    # TODO: How to we separate the tree data (the parent and child relationships between calls) from the metadata?
-    # What if a user wants to add a field called parent, or child? (Just name the fields `bramble_parent` and `bramble_children`)
 
     def append_data(self, chunk_data: Mapping[str, bytes]) -> Mapping[str, int]:
         """Appends data to chunks.
@@ -133,7 +143,7 @@ class BrambleBackend:
         """
         return self.set_active_chunks(chunk_ids=chunk_ids)
 
-    def get_branch_ids(self, num_ids: int = None) -> Sequence[str]:
+    def get_branch_ids(self, num_ids: int = None) -> Generator[str, None, None]:
         """Get branch IDs from the master list.
 
         Gets the most recent `num_ids` branch IDs from the master list. If
@@ -142,10 +152,16 @@ class BrambleBackend:
 
         Args:
             num_ids (int): The number of IDs to get from the master list.
+
+        Returns:
+            (Generator[str, None, None]): A generator yielding the ordered
+                branch IDs.
         """
         raise NotImplementedError(f"{type(self)} does not implement `get_branch_ids`!")
 
-    async def async_get_branch_ids(self, num_ids: int = None) -> Sequence[str]:
+    async def async_get_branch_ids(
+        self, num_ids: int = None
+    ) -> Generator[str, None, None]:
         """Get branch IDs from the master list.
 
         Gets the most recent `num_ids` branch IDs from the master list. If
@@ -154,6 +170,10 @@ class BrambleBackend:
 
         Args:
             num_ids (int): The number of IDs to get from the master list.
+
+        Returns:
+            (Generator[str, None, None]): A generator yielding the ordered
+                branch IDs.
         """
         return self.get_branch_ids(num_ids=num_ids)
 
@@ -239,6 +259,9 @@ class BrambleBackend:
 
 
 # TODO: create a `BrambleBackend` class to replace this
+from typing import Dict, List, Tuple
+
+
 class BrambleWriter:
     """Writing backend interface for `bramble` logging.
 

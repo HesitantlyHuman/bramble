@@ -7,7 +7,7 @@ import datetime
 from bramble.ui.copy_button import copy_button, enable_copy_buttons
 from bramble.ui.navigation import go_to_branch, go_to_search
 from bramble.ui.data import load_branch_data
-from bramble.logs import LogEntry
+from bramble.log_objects import LogEntry
 
 # TODO: improve rendering of parent and children to use the names of the branches instead of the ids
 

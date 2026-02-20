@@ -5,7 +5,7 @@ import json
 import os
 
 from bramble.backends.base import BrambleWriter, BrambleReader
-from bramble.logs import LogEntry, BranchData
+from bramble.log_objects import LogEntry, BranchData
 
 
 class FileWriter(BrambleWriter):

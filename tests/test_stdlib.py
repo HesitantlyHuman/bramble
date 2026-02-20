@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from bramble.stdlib import BrambleHandler, hook_logging
-from bramble.logs import MessageType
+from bramble.log_objects import MessageType
 
 
 def make_log_record(level, msg="test msg"):

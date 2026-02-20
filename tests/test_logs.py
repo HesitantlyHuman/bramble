@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime
 import dataclasses
 
-from bramble.logs import MessageType, LogEntry, BranchData
+from bramble.log_objects import MessageType, LogEntry, BranchData
 
 
 def test_message_type_from_valid_strings():

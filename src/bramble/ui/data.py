@@ -4,7 +4,7 @@ import pandas as pd
 import datetime
 import asyncio
 
-from bramble.logs import MessageType
+from bramble.log_objects import MessageType
 from bramble.backends import FileReader
 from bramble.backends.base import BrambleReader
 

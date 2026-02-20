@@ -10,7 +10,7 @@ import time
 from bramble.utils import _validate_log_call, _generate_id
 from bramble.backends.base import BrambleWriter
 from bramble.stdlib import hook_logging
-from bramble.logs import (
+from bramble.log_objects import (
     MessageType,
     LogEntry,
 )

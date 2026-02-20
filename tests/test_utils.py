@@ -4,7 +4,7 @@ from bramble.utils import (
     _validate_tags_and_metadata,
     _stringify_function_call,
 )
-from bramble.logs import MessageType
+from bramble.log_objects import MessageType
 
 
 def test_validate_log_call_str_message_and_default_type():

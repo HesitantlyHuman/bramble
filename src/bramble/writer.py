@@ -2,7 +2,7 @@ from typing import Dict, List, Tuple
 
 import asyncio
 
-from bramble.logs import LogEntry
+from bramble.log_objects import LogEntry
 from bramble.compression import ChunkCompressor
 from bramble.backends import BrambleBackend
 

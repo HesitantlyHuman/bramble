@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from bramble.loggers import TreeLogger, LogBranch
 from bramble.backends.base import BrambleWriter
-from bramble.logs import MessageType
+from bramble.log_objects import MessageType
 
 
 class MockWriter(BrambleWriter):

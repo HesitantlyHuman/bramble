@@ -4,7 +4,7 @@ from redis import asyncio as aioredis
 import msgpack
 
 from bramble.backends.base import BrambleWriter, BrambleReader
-from bramble.logs import LogEntry, BranchData, MessageType
+from bramble.log_objects import LogEntry, BranchData, MessageType
 
 REDIS_PREFIX = "bramble:logging:"
 

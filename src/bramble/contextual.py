@@ -6,7 +6,7 @@ from bramble.utils import (
     _validate_log_call,
     _validate_tags_and_metadata,
 )
-from bramble.logs import MessageType
+from bramble.log_objects import MessageType
 from bramble.loggers import (
     _CURRENT_BRANCH_IDS,
     _LIVE_BRANCHES,

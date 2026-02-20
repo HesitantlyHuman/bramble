@@ -7,7 +7,7 @@ from contextlib import nullcontext
 from bramble.contextual import log, apply, context, disable, enable, fork
 from bramble.utils import _stringify_function_call
 from bramble.backends.base import BrambleWriter
-from bramble.logs import MessageType, LogEntry
+from bramble.log_objects import MessageType, LogEntry
 from bramble.loggers import TreeLogger, LogBranch
 from bramble.wrapper import branch
 

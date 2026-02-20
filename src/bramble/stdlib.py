@@ -1,6 +1,6 @@
 import logging
 
-from bramble.logs import MessageType
+from bramble.log_objects import MessageType
 
 
 class BrambleHandler(logging.Handler):

@@ -3,7 +3,7 @@ from typing import Dict, Tuple, List
 import uuid
 import traceback
 
-from bramble.logs import MessageType
+from bramble.log_objects import MessageType
 
 
 def _generate_id() -> str:
