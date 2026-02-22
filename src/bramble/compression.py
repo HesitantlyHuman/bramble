@@ -143,7 +143,6 @@ class EntryWriter(Writer):
         return data
 
 
-# TODO: The return values here seem kinda dumb.... maybe we should be collecting here?
 class MetadataReader(Reader):
     def read_next(
         self,
@@ -288,144 +287,72 @@ class EntryReader(Reader):
 # TODO: Change all internal representations of children and tags to be sets. Keep external interfaces using lists, for simplicity.
 
 
-class ChunkCompressor:
-    # TODO: when we do the assignments we should pop from a list, so that we ensure we are using all of our active chunks. Then when we create a new list, we order it by the current size. Or, we have a list and we get the one from the list which is smallest currently, then pop.
-
-    def __init__(self, num_simultaneous_chunks: int = 32, chunk_size: int = 2**24):
-        self.num_simultaneous_chunks = num_simultaneous_chunks
-        self.entry_compressors = {
-            _generate_id("ec"): EntryWriter.new()
-            for _ in range(num_simultaneous_chunks)
-        }
-        self.metadata_compressors = {
-            _generate_id("mc"): MetadataWriter.new()
-            for _ in range(num_simultaneous_chunks)
-        }
-        self.chunk_size = chunk_size
-
-        self._id_to_compressor_map: Dict[str, str] = {}
-        self._name_to_compressor_map: Dict[str, str] = {}
-        self._compressor_to_names_and_ids: Dict[int, Tuple[Set[str], Set[str]]] = {}
-        self._assignment_options: List[str] = []
-
-    # TODO: we need to assign both a metadata and an entry chunk
-    def get_or_assign_compressor(self, branch_id: str, branch_name: str) -> str:
-        # First, identify if we have already assigned this branch_id
-        if branch_id in self.id_to_compressor_map:
-            return self.id_to_compressor_map[branch_id]
-
-        # Otherwise, check if we have already assigned this name
-        if branch_name in self.name_to_compressor_map:
-            # Assign this branch id to the same compressor
-            assigned_compressor = self.name_to_compressor_map[branch_name]
-            self.id_to_compressor_map[branch_id] = assigned_compressor
-            # Update the compressor map with the branch id
-            self.compressor_to_names_and_ids[assigned_compressor][1].add(branch_id)
-            return assigned_compressor
-
-        # Otherwise, just assign this to the smallest current compressor
-        assigned_compressor = min(
-            range(len(self.compressors)), key=lambda x: self.compressors[x].len()
-        )
-        self.id_to_compressor_map[branch_id] = assigned_compressor
-        self.name_to_compressor_map[branch_name] = assigned_compressor
-        self.compressor_to_names_and_ids[assigned_compressor][0].add(branch_name)
-        self.compressor_to_names_and_ids[assigned_compressor][1].add(branch_id)
-        return assigned_compressor
-
-    def _maybe_write_chunk(self, compressor_id: int) -> None | bytes:
-        if self.compressors[compressor_id].len() < self.chunk_size:
-            return None
-
-        chunk = self.compressors[compressor_id].data
-
-        names, ids = self.compressor_to_names_and_ids[compressor_id]
-        del self.compressor_to_names_and_ids[compressor_id]
-
-        for name in names:
-            del self.name_to_compressor_map[name]
-
-        for id in ids:
-            del self.id_to_compressor_map[id]
-
-        self.compressors[compressor_id] = CompressionWriter.new()
-
-        return chunk
-
-    def add(self, branch_id: str, branch_name: str, entry: LogEntry) -> None | bytes:
-        compressor_id = self._get_or_assign_compressor(
-            branch_id=branch_id, branch_name=branch_name
-        )
-        self.compressors[compressor_id].add(branch_id=branch_id, entry=entry)
-        return self._maybe_write_chunk(compressor_id=compressor_id)
-
-
 if __name__ == "__main__":
     from bramble.utils import _generate_id
 
-    # example_entry = LogEntry(
-    #     """Here is a message that we want to have saved and compressed, because otherwise our logs become too large and unwieldy! Here is a message that we want to have saved and compressed, because otherwise our logs become too large and unwieldy!""",
-    #     112340.2345,
-    #     MessageType.USER,
-    #     entry_metadata=None,
-    # )
+    example_entry = LogEntry(
+        """Here is a message that we want to have saved and compressed, because otherwise our logs become too large and unwieldy! Here is a message that we want to have saved and compressed, because otherwise our logs become too large and unwieldy!""",
+        112340.2345,
+        MessageType.USER,
+        entry_metadata=None,
+    )
 
-    # data = b""
-    # writer = EntryWriter.new()
-    # id = _generate_id()
-    # print(id)
+    data = b""
+    writer = EntryWriter.new()
+    id = _generate_id()
+    print(id)
 
-    # for _ in range(3):
-    #     next_bytes = writer.add(id, example_entry)
-    #     data += next_bytes
-    #     print(len(next_bytes))
+    for _ in range(3):
+        next_bytes = writer.add(id, example_entry)
+        data += next_bytes
+        print(len(next_bytes))
 
-    # id = _generate_id()
-    # for _ in range(2):
-    #     next_bytes = writer.add(id, example_entry)
-    #     data += next_bytes
-    #     print(len(next_bytes))
+    id = _generate_id()
+    for _ in range(2):
+        next_bytes = writer.add(id, example_entry)
+        data += next_bytes
+        print(len(next_bytes))
 
-    # reader = EntryReader.new(data)
-    # for branch_id, log_entry in reader.read():
-    #     print(branch_id, log_entry)
+    reader = EntryReader.new(data)
+    for branch_id, log_entry in reader.read():
+        print(branch_id, log_entry)
 
-    # writer = MetadataWriter.new()
+    writer = MetadataWriter.new()
 
-    # data = b""
-    # id = _generate_id()
-    # data += writer.add(
-    #     id,
-    #     "parent",
-    #     ["a", "b", "c"],
-    #     ["tag_a", "tag-b"],
-    #     {"key": "value", "another": 235},
-    # )
-    # data += writer.add(
-    #     id,
-    #     None,
-    #     ["d"],
-    #     None,
-    #     {"another": 244},
-    # )
-    # print(len(data))
-    # data += writer.add(
-    #     _generate_id(),
-    #     "parent",
-    #     ["a", "b", "c"],
-    #     ["tag_a", "tag-b"],
-    #     {"key": "value", "another": 235},
-    # )
-    # print(len(data))
-    # data += writer.add(
-    #     _generate_id(),
-    #     "parent",
-    #     ["a", "b", "c"],
-    #     ["tag_a", "tag-b"],
-    #     {"key": "value", "another": 235},
-    # )
-    # print(len(data))
+    data = b""
+    id = _generate_id()
+    data += writer.add(
+        id,
+        "parent",
+        ["a", "b", "c"],
+        ["tag_a", "tag-b"],
+        {"key": "value", "another": 235},
+    )
+    data += writer.add(
+        id,
+        None,
+        ["d"],
+        None,
+        {"another": 244},
+    )
+    print(len(data))
+    data += writer.add(
+        _generate_id(),
+        "parent",
+        ["a", "b", "c"],
+        ["tag_a", "tag-b"],
+        {"key": "value", "another": 235},
+    )
+    print(len(data))
+    data += writer.add(
+        _generate_id(),
+        "parent",
+        ["a", "b", "c"],
+        ["tag_a", "tag-b"],
+        {"key": "value", "another": 235},
+    )
+    print(len(data))
 
-    # reader = MetadataReader.new(data)
-    # for output in reader.read():
-    #     print(output)
+    reader = MetadataReader.new(data)
+    for output in reader.read():
+        print(output)

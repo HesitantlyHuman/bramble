@@ -1,12 +1,11 @@
-from typing import Dict, List, Tuple, Set, Any
+from typing import Dict, List, Tuple, Set, Any, Iterable, Callable
 
 import asyncio
 
+from bramble.utils import _generate_id
 from bramble.log_objects import LogEntry
-from bramble.compression import EntryWriter, MetadataWriter
 from bramble.backends.base import BrambleBackend
-
-from utils import _generate_id
+from bramble.compression import EntryWriter, MetadataWriter, Writer
 
 
 # TODO: Document functions, settings
@@ -57,82 +56,47 @@ class BrambleWriter:
 
         self._chunk_sizes = Dict[str, int] = {}
 
-    def _assign_entry_chunk(self, branch_id: str, name: str) -> str:
-        current_num_entry_assignments = {
-            chunk_id: len(vals)
-            for chunk_id, vals in self._entry_chunk_to_ids_and_names.items()
+    def _assignment_helper(
+        self,
+        branch_id: str,
+        name: str,
+        compressors: Dict[str, Writer],
+        id_to_compressor_map: Dict[str, str],
+        name_to_compressor_map: Dict[str, Set[str]],
+        chunk_to_ids_and_names: Dict[int, Set[Tuple[str, str]]],
+        chunk_assignment_options: Set[str],
+    ) -> str:
+        current_num_assignments = {
+            chunk_id: len(vals) for chunk_id, vals in chunk_to_ids_and_names.items()
         }
         max_entry_allowed = int(
             (
-                min(list(current_num_entry_assignments.values()))
+                min(list(current_num_assignments.values()))
                 + self.base_assignment_imbalance_num
             )
             * self.max_assignment_imbalance_factor
         )
-        if len(self._entry_chunk_assignment_options) == 0:
-            self._entry_chunk_assignment_options = set(self._entry_compressors.keys())
+        if len(chunk_assignment_options) == 0:
+            chunk_assignment_options.update(compressors.keys())
 
         # First, attempt to assign by name, then, just assign to any chunk
-        for entry_compressor_candidates in [
-            self._name_to_entry_compressor_map.get(name),
-            self._entry_chunk_assignment_options,
+        for compressor_candidates in [
+            name_to_compressor_map.get(name),
+            chunk_assignment_options,
         ]:
-            if entry_compressor_candidates is not None:
-                ids_and_sizes = [
-                    (candidate, current_num_entry_assignments[candidate])
-                    for candidate in entry_compressor_candidates
-                ]
-                ids_and_sizes.sort(key=lambda x: x[1])
-                selected_id, current_num_assignments = ids_and_sizes[0]
+            if compressor_candidates is not None:
+                selected_id, current_num_assignments = min(
+                    [
+                        (candidate, current_num_assignments[candidate])
+                        for candidate in compressor_candidates
+                    ],
+                    key=lambda x: x[1],
+                )
                 if current_num_assignments <= max_entry_allowed:
-                    self._id_to_entry_compressor_map[branch_id] = selected_id
-                    if name not in self._name_to_entry_compressor_map:
-                        self._name_to_entry_compressor_map[name] = set()
-                    self._name_to_entry_compressor_map[name].add(selected_id)
-                    self._entry_chunk_to_ids_and_names[selected_id].add(
-                        (branch_id, name)
-                    )
-                    self._entry_chunk_assignment_options.remove(selected_id)
-                    return selected_id
-
-        raise RuntimeError(f"Reached unexpected termination condition!")
-
-    def _assign_meta_chunk(self, branch_id: str, name: str) -> str:
-        current_num_meta_assignments = {
-            chunk_id: len(vals)
-            for chunk_id, vals in self._meta_chunk_to_ids_and_names.items()
-        }
-        max_meta_allowed = int(
-            (
-                min(list(current_num_meta_assignments.values()))
-                + self.base_assignment_imbalance_num
-            )
-            * self.max_assignment_imbalance_factor
-        )
-        if len(self._meta_chunk_assignment_options) == 0:
-            self._meta_chunk_assignment_options = set(self._meta_compressors.keys())
-
-        # First, attempt to assign by name, then, just assign to any chunk
-        for meta_compressor_candidates in [
-            self._name_to_meta_compressor_map.get(name),
-            self._meta_chunk_assignment_options,
-        ]:
-            if meta_compressor_candidates is not None:
-                ids_and_sizes = [
-                    (candidate, current_num_meta_assignments[candidate])
-                    for candidate in meta_compressor_candidates
-                ]
-                ids_and_sizes.sort(key=lambda x: x[1])
-                selected_id, current_num_assignments = ids_and_sizes[0]
-                if current_num_assignments <= max_meta_allowed:
-                    self._id_to_meta_compressor_map[branch_id] = selected_id
-                    if name not in self._name_to_meta_compressor_map:
-                        self._name_to_meta_compressor_map[name] = set()
-                    self._name_to_meta_compressor_map[name].add(selected_id)
-                    self._meta_chunk_to_ids_and_names[selected_id].add(
-                        (branch_id, name)
-                    )
-                    self._meta_chunk_assignment_options.remove(selected_id)
+                    id_to_compressor_map[branch_id] = selected_id
+                    name_to_compressor_map.setdefault(name, set()).add(selected_id)
+                    chunk_to_ids_and_names[selected_id].add((branch_id, name))
+                    chunk_assignment_options.remove(selected_id)
                     return selected_id
 
         raise RuntimeError(f"Reached unexpected termination condition!")
@@ -140,8 +104,24 @@ class BrambleWriter:
     def _assign_chunk(self, branch_id: str, name: str) -> Tuple[str, str]:
         """Assigns branches to chunks."""
         return (
-            self._assign_entry_chunk(branch_id=branch_id, name=name),
-            self._assign_meta_chunk(branch_id=branch_id, name=name),
+            self._assignment_helper(
+                branch_id=branch_id,
+                name=name,
+                compressors=self._entry_compressors,
+                id_to_compressor_map=self._id_to_entry_compressor_map,
+                name_to_compressor_map=self._name_to_entry_compressor_map,
+                chunk_to_ids_and_names=self._entry_chunk_to_ids_and_names,
+                chunk_assignment_options=self._entry_chunk_assignment_options,
+            ),
+            self._assignment_helper(
+                branch_id=branch_id,
+                name=name,
+                compressors=self._meta_compressors,
+                id_to_compressor_map=self._id_to_meta_compressor_map,
+                name_to_compressor_map=self._name_to_meta_compressor_map,
+                chunk_to_ids_and_names=self._meta_chunk_to_ids_and_names,
+                chunk_assignment_options=self._meta_chunk_assignment_options,
+            ),
         )
 
     def _assign_chunks(
@@ -200,6 +180,65 @@ class BrambleWriter:
         for branch_id in branch_ids:
             self._close_branch(branch_id=branch_id)
 
+        self._name_to_entry_compressor_map: Dict[str, Set[str]] = {}
+        self._name_to_meta_compressor_map: Dict[str, Set[str]] = {}
+
+        for chunk_id, ids_and_names in self._entry_chunk_to_ids_and_names:
+            for _, name in ids_and_names:
+                self._name_to_entry_compressor_map.setdefault(name, set()).add(chunk_id)
+
+        for chunk_id, ids_and_names in self._meta_chunk_to_ids_and_names:
+            for _, name in ids_and_names:
+                self._name_to_meta_compressor_map.setdefault(name, set()).add(chunk_id)
+
+    async def _build_and_write_chunks(
+        self,
+        item_iterable: Iterable[Tuple[str, Any]],
+        compression_function: Callable[[str, str, Any], bytes],
+        compressor_creation_function: Callable[[], Tuple[str, Writer]],
+        compressors: Dict[str, Writer],
+        id_to_compressor_map: Dict[str, str],
+        name_to_compressor_map: Dict[str, Set[str]],
+        chunk_to_ids_and_names: Dict[str, Set[Tuple[str, str]]],
+    ) -> Dict[str, bytes]:
+        chunk_ids_to_cleanup: Set[str] = set()
+        logging_data_by_chunk: Dict[str, bytes] = {}
+        for branch_id, item in item_iterable:
+            chunk_id = id_to_compressor_map[branch_id]
+            next_bytes = compression_function(chunk_id, branch_id, item)
+            logging_data_by_chunk.setdefault(chunk_id, b"")
+            logging_data_by_chunk[chunk_id] += next_bytes
+
+            # If we are already over the chunk size, or if receiving another
+            # similarly sized chunk would put us over the chunk size, then we
+            # will move to a new chunk.
+            if (
+                len(logging_data_by_chunk[chunk_id])
+                + self._chunk_sizes[chunk_id]
+                + len(next_bytes)
+                >= self.chunk_size
+            ):
+                chunk_ids_to_cleanup.add(chunk_id)
+                new_chunk_id, new_compressor = compressor_creation_function()
+                compressors[new_chunk_id] = new_compressor
+                chunk_to_ids_and_names[new_chunk_id] = chunk_to_ids_and_names[chunk_id]
+                for id_to_transfer, name_to_transfer in chunk_to_ids_and_names[
+                    new_chunk_id
+                ]:
+                    id_to_compressor_map[id_to_transfer] = new_chunk_id
+                    name_to_compressor_map[name_to_transfer].remove(chunk_id)
+                    name_to_compressor_map[name_to_transfer].add(new_chunk_id)
+
+        chunk_sizes = await self.bramble_backend.async_append_data(
+            chunk_data=logging_data_by_chunk
+        )
+        self._chunk_sizes.update(chunk_sizes)
+
+        for chunk_id in chunk_ids_to_cleanup:
+            del compressors[chunk_id]
+            del chunk_to_ids_and_names[chunk_id]
+            del self._chunk_sizes[chunk_id]
+
     async def append_entries(
         self,
         entries: Dict[str, List[LogEntry]],
@@ -210,18 +249,24 @@ class BrambleWriter:
             log_entries (Dict[str, List[LogEntry]]): The log entries to append,
             keyed by branch id.
         """
-        # TODO: Change to new chunks if we have exceeded our size
-        logging_data_by_chunk: Dict[str, bytes] = {}
-        for branch_id, log_entries in entries.items():
-            chunk_id = self._id_to_entry_compressor_map[branch_id]
-            if chunk_id not in logging_data_by_chunk:
-                logging_data_by_chunk[chunk_id] = b""
-            for entry in log_entries:
-                logging_data_by_chunk[chunk_id] += self._entry_compressors[
-                    chunk_id
-                ].add(branch_id=branch_id, entry=entry)
 
-        await self.bramble_backend.async_append_data(chunk_data=logging_data_by_chunk)
+        def _compress(chunk_id: str, branch_id: str, log_entry: LogEntry) -> bytes:
+            return self._entry_compressors[chunk_id].add(
+                branch_id=branch_id, entry=log_entry
+            )
+
+        def _create_compressor() -> Tuple[str, EntryWriter]:
+            return _generate_id("ec"), EntryWriter.new(quality=self.compression_quality)
+
+        await self._build_and_write_chunks(
+            item_iterable=iter(entries.items()),
+            compression_function=_compress,
+            compressor_creation_function=_create_compressor,
+            compressors=self._entry_compressors,
+            id_to_compressor_map=self._id_to_entry_compressor_map,
+            name_to_compressor_map=self._name_to_entry_compressor_map,
+            chunk_to_ids_and_names=self._entry_chunk_to_ids_and_names,
+        )
 
     async def update_branch_info(
         self,
@@ -231,24 +276,51 @@ class BrambleWriter:
         metadata: Dict[str, Dict[str, str | int | float | bool]] | None,
     ) -> None:
         """Updates info for branches."""
-        # TODO: Change to new chunks if we have exceeded our size
-        metadata_data_by_chunk: Dict[str, bytes] = {}
         branch_ids = (
             set(parents.keys())
             | set(children.keys())
             | set(tags.keys())
             | set(metadata.keys())
         )
-        for branch_id in branch_ids:
-            chunk_id = self._id_to_meta_compressor_map[branch_id]
-            if chunk_id not in metadata_data_by_chunk:
-                metadata_data_by_chunk[chunk_id] = b""
-            metadata_data_by_chunk[chunk_id] += self._meta_compressors[chunk_id].add(
+
+        def _iterable():
+            for branch_id in branch_ids:
+                yield (
+                    branch_id,
+                    (
+                        parents.get(branch_id),
+                        children.get(branch_id),
+                        tags.get(branch_id),
+                        metadata.get(branch_id),
+                    ),
+                )
+
+        def _compress(chunk_id: str, branch_id: str, branch_info: tuple) -> bytes:
+            parent, children, tags, metadata = branch_info
+            return self._meta_compressors[chunk_id].add(
                 branch_id=branch_id,
-                parent=parents.get(branch_id),
-                children=children.get(branch_id),
-                tags=tags.get(branch_id),
-                metadata=metadata.get(branch_id),
+                parent=parent,
+                children=children,
+                tags=tags,
+                metadata=metadata,
             )
 
-        await self.bramble_backend.async_append_data(chunk_data=metadata_data_by_chunk)
+        def _create_compressor() -> Tuple[str, MetadataWriter]:
+            return _generate_id("mc"), MetadataWriter.new(
+                quality=self.compression_quality
+            )
+
+        await self._build_and_write_chunks(
+            item_iterable=_iterable(),
+            compression_function=_compress,
+            compressor_creation_function=_create_compressor,
+            compressors=self._meta_compressors,
+            id_to_compressor_map=self._id_to_meta_compressor_map,
+            name_to_compressor_map=self._name_to_meta_compressor_map,
+            chunk_to_ids_and_names=self._meta_chunk_to_ids_and_names,
+        )
+
+
+# TODO: generate tests
+# - Number of compressors stays constant
+# - branch id assignments transfer correctly

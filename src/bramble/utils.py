@@ -7,10 +7,10 @@ from bramble.log_objects import MessageType
 
 
 def _generate_id(prefix: str = None) -> str:
-    uuid = str(uuid.uuid4().hex)[:24]
+    id_component = str(uuid.uuid4().hex)[:24]
     if prefix:
-        uuid = prefix + "-" + uuid
-    return uuid
+        return prefix + "-" + id_component
+    return id_component
 
 
 def _stringify_function_call(func, args: list, kwargs: dict):

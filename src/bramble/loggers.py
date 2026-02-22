@@ -1,4 +1,4 @@
-from typing import Set, Dict, List
+from typing import Set, Dict, List, Any, Tuple
 
 import contextvars
 import threading
@@ -8,7 +8,8 @@ import queue
 import time
 
 from bramble.utils import _validate_log_call, _generate_id
-from bramble.backends.base import BrambleWriter
+from bramble.backends.base import BrambleBackend
+from bramble.writer import BrambleWriter
 from bramble.stdlib import hook_logging
 from bramble.log_objects import (
     MessageType,
@@ -24,6 +25,8 @@ _ENABLED: contextvars.ContextVar[bool] = contextvars.ContextVar(
 )
 
 
+# TODO: figure out how to nicely expose the BrambleWriter parameters
+# TODO: Add closing of branches!!!
 class TreeLogger:
     """A branching logger for async processes.
 
@@ -33,26 +36,28 @@ class TreeLogger:
     """
 
     root: "LogBranch"
-    logging_backend: BrambleWriter
+    logging_backend: BrambleBackend
+    logging_writer: BrambleWriter
     silent: bool
 
     def __init__(
         self,
-        logging_backend: BrambleWriter,
+        logging_backend: BrambleBackend,
         name: str = "entry",
         debounce: float = 0.25,
         batch_size: int = 50,
         silent: bool = False,
     ):
-        if not isinstance(logging_backend, BrambleWriter):
+        if not isinstance(logging_backend, BrambleBackend):
             raise ValueError(
-                f"`logging_backend` must be of type `BrambleWriter`, received {type(logging_backend)}."
+                f"`logging_backend` must be of type `BrambleBackend`, received {type(logging_backend)}."
             )
 
         if not isinstance(name, str):
             raise ValueError(f"`name` must be of type `str`, received {type(name)}.")
 
         self.logging_backend = logging_backend
+        self.logging_writer = BrambleWriter(self.logging_backend)
         self.silent = silent
 
         self._tasks = queue.SimpleQueue()
@@ -64,10 +69,9 @@ class TreeLogger:
 
     def run(self):
         async def _run():
-            log_tasks, meta_tasks = (
-                None,
-                None,
-            )
+            logging_tasks: Dict[str, List[LogEntry]] = None
+            metadata_tasks: Dict[str, Dict[str, Any]] = None
+            branch_creation_tasks: Set[Tuple[str, str]] = None
 
             deadline = None
 
@@ -76,7 +80,11 @@ class TreeLogger:
                     [0]
                     + [
                         len(item)
-                        for item in [log_tasks, meta_tasks]
+                        for item in [
+                            logging_tasks,
+                            metadata_tasks,
+                            branch_creation_tasks,
+                        ]
                         if item is not None
                     ]
                 )
@@ -97,79 +105,77 @@ class TreeLogger:
                         case 0:
                             _, branch_id, log_entry = task
 
-                            if not log_tasks:
-                                log_tasks = {}
+                            if not logging_tasks:
+                                logging_tasks = {}
 
-                            if not branch_id in log_tasks:
-                                log_tasks[branch_id] = []
-
-                            log_tasks[branch_id].append(log_entry)
+                            logging_tasks.setdefault(branch_id, []).append(log_entry)
                         case 1:
                             _, branch_id, parent, children = task
 
-                            if not meta_tasks:
-                                meta_tasks = {}
+                            if not metadata_tasks:
+                                metadata_tasks = {}
 
-                            if not branch_id in meta_tasks:
-                                meta_tasks[branch_id] = {}
-
-                            meta_tasks[branch_id]["parent"] = parent
-                            meta_tasks[branch_id]["children"] = list(set(children))
+                            metadata_tasks.setdefault(branch_id, {})["parent"] = parent
+                            metadata_tasks.setdefault(branch_id, {}).setdefault(
+                                "children", set()
+                            ).update(children)
                         case 2:
                             _, branch_id, metadata = task
 
-                            if not meta_tasks:
-                                meta_tasks = {}
+                            if not metadata_tasks:
+                                metadata_tasks = {}
 
-                            if not branch_id in meta_tasks:
-                                meta_tasks[branch_id] = {}
-
-                            if not "metadata" in meta_tasks[branch_id]:
-                                meta_tasks[branch_id]["metadata"] = {}
-
-                            meta_tasks[branch_id]["metadata"].update(metadata)
+                            metadata_tasks.setdefault(branch_id, {}).setdefault(
+                                "metadata", {}
+                            ).update(metadata)
                         case 3:
                             _, branch_id, tags = task
 
-                            if not meta_tasks:
-                                meta_tasks = {}
+                            if not metadata_tasks:
+                                metadata_tasks = {}
 
-                            if not branch_id in meta_tasks:
-                                meta_tasks[branch_id] = {}
+                            metadata_tasks.setdefault(branch_id, {}).setdefault(
+                                "tags", set()
+                            ).update(tags)
+                        case 4:
+                            _, branch_id, name = task
 
-                            if not "tags" in meta_tasks[branch_id]:
-                                meta_tasks[branch_id]["tags"] = set()
+                            if not branch_creation_tasks:
+                                branch_creation_tasks = set()
 
-                            meta_tasks[branch_id]["tags"].update(set(tags))
+                            branch_creation_tasks.add((branch_id, name))
 
                 if (
                     time.time() > deadline
                     or get_batch_size() >= self._batch_size
                     or task is None
                 ):
+                    if branch_creation_tasks:
+                        await self.logging_writer.add_branches(branch_creation_tasks)
+
                     todo = []
 
-                    # TODO: Here is where we need to do something different
-                    # and insert some sort of writer
-                    # Also, we need to figure out how to add to the list of
-                    # branches, when we make a new one.
-                    if log_tasks:
+                    if logging_tasks:
                         todo.append(
-                            self.logging_backend.async_append_entries(
-                                entries=log_tasks,
+                            self.logging_writer.append_entries(
+                                entries=logging_tasks,
                             )
                         )
 
-                    if meta_tasks:
+                    if metadata_tasks:
                         todo.append(
-                            self.logging_backend.async_update_branch_metadata(
-                                metadata=meta_tasks,
+                            self.logging_writer.update_branch_info(
+                                parents=metadata_tasks["parent"],
+                                children=metadata_tasks["children"],
+                                tags=metadata_tasks["tags"],
+                                metadata=metadata_tasks["metadata"],
                             )
                         )
 
                     await asyncio.gather(*todo)
 
-                    log_tasks, meta_tasks = (
+                    logging_tasks, metadata_tasks, branch_creation_tasks = (
+                        None,
                         None,
                         None,
                     )
@@ -189,7 +195,6 @@ class TreeLogger:
     def log(
         self,
         branch_id: str,
-        branch_name: str,
         message: str | Exception,
         message_type: MessageType | str = MessageType.USER,
         entry_metadata: Dict[str, str | int | float | bool] | None = None,
@@ -229,9 +234,9 @@ class TreeLogger:
             message_type=message_type,
             entry_metadata=entry_metadata,
         )
-        self._tasks.put((0, branch_id, branch_name, log_entry))
+        self._tasks.put((0, branch_id, log_entry))
 
-    def _update_tree(self, branch_id: str, parent: str, children: List[str]) -> None:
+    def _update_tree(self, branch_id: str, parent: str, children: Set[str]) -> None:
         self._tasks.put((1, branch_id, parent, children))
 
     def _update_metadata(
@@ -239,8 +244,11 @@ class TreeLogger:
     ) -> None:
         self._tasks.put((2, branch_id, metadata))
 
-    def _update_tags(self, branch_id: str, tags: List[str]) -> None:
+    def _update_tags(self, branch_id: str, tags: Set[str]) -> None:
         self._tasks.put((3, branch_id, tags))
+
+    def _create_branch(self, branch_id: str, name: str) -> None:
+        self._tasks.put((4, branch_id, name))
 
     def __enter__(self):
         current_logger_ids = _CURRENT_BRANCH_IDS.get()
@@ -297,8 +305,8 @@ class LogBranch:
     id: str
     name: str
     parent: str | None
-    children: List[str]
-    tags: List[str]
+    children: Set[str]
+    tags: Set[str]
     metadata: Dict[str, str | int | float | bool]
 
     slots = (
@@ -312,13 +320,10 @@ class LogBranch:
     )
 
     def __init__(self, name: str, tree_logger: TreeLogger, id: str = None):
-        # TODO: here is where we need to do more than add metadata
-        # We need to also indicate to the tree logger that we have created
-        # a new branch, and so that branch id needs to be recorded.
         self.name = name
         self.parent = None
-        self.children = []
-        self.tags = []
+        self.children = set()
+        self.tags = set()
         self.metadata = {"name": name}
 
         self.tree_logger = tree_logger
@@ -328,6 +333,7 @@ class LogBranch:
         self.id = id
 
         self.tree_logger._update_metadata(self.id, self.metadata)
+        self.tree_logger._create_branch(self.id, self.name)
 
     def log(
         self,
@@ -388,7 +394,7 @@ class LogBranch:
             raise ValueError(
                 f"`child_id` must be of type `str`, received {type(child_id)}."
             )
-        self.children.append(child_id)
+        self.children.add(child_id)
         self.tree_logger._update_tree(self.id, self.parent, self.children)
 
     def set_parent(self, parent_id: str) -> None:
@@ -407,7 +413,7 @@ class LogBranch:
                 raise ValueError(
                     f"Each entry of `tags` must be of type `str`, received {type(tag)}."
                 )
-        self.tags.extend(tags)
+        self.tags.update(tags)
         self.tree_logger._update_tags(self.id, self.tags)
 
     def add_metadata(self, metadata: Dict[str, str | int | float | bool]) -> None:

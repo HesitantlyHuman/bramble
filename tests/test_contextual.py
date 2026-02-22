@@ -6,7 +6,7 @@ from contextlib import nullcontext
 
 from bramble.contextual import log, apply, context, disable, enable, fork
 from bramble.utils import _stringify_function_call
-from bramble.backends.base import BrambleWriter
+from bramble.writer import BrambleWriter
 from bramble.log_objects import MessageType, LogEntry
 from bramble.loggers import TreeLogger, LogBranch
 from bramble.wrapper import branch
@@ -14,10 +14,10 @@ from bramble.wrapper import branch
 
 class MockWriter(BrambleWriter):
     def __init__(self):
-        self.async_append_entries = AsyncMock()
-        self.async_update_tree = AsyncMock()
-        self.async_update_branch_metadata = AsyncMock()
-        self.async_add_tags = AsyncMock()
+        self.add_branches = AsyncMock()
+        self.close_branches = AsyncMock()
+        self.append_entries = AsyncMock()
+        self.update_branch_info = AsyncMock()
 
 
 @pytest.fixture

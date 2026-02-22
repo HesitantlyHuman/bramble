@@ -53,6 +53,7 @@ class LogEntry:
         return cls(**dictionary)
 
 
+# TODO: should we be using this where I have `branch_info` things?
 @dataclass(frozen=True, slots=True)
 class BranchData:
     """A tree logger branch's full info."""
