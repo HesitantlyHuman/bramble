@@ -26,3 +26,8 @@ What if we only put the branch id if it has changed? And since we are routing to
 ## Additional:
 - Can we dynamically add the line of code? So that where the logging message came from can be audited?
 - Only show some N previous logs by default in the streamlit view. Only show top level logs (i.e. have no parent)
+
+## Naming
+branch_info -> parent, children, tags, metadata
+metadata -> user added metadata (either for branch or log entry)
+log_entry -> a particular entry in the logs; message, timestamp, message_type, metadata

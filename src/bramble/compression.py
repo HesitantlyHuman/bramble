@@ -10,6 +10,8 @@ from bramble.backends.base import ByteSource, as_byte_source
 
 PREFIX_SIZE: int = 2
 
+# TODO: test the compression ratio of various chunk sizes, as well as read and write speeds
+
 
 def _pack_compress_flush(compressor: Any, input: Any) -> bytes:
     data = b""
@@ -29,9 +31,6 @@ def _pack_compress_flush(compressor: Any, input: Any) -> bytes:
 # TODO: We should set a max on how uneven we assign the chunks. We don't want all the branches with the same name in the same chunk, if there is a ton, because then we create a big ol linked bunch that will use up a whole bunch of chunks.
 
 
-# TODO: The compression quality should be a parameter that can be set. Investigate the overhead of various qualities, to get a good default.
-# TODO: Add the compression quality as an initial value to each chunk, and have the writer set its quality using that.
-# TODO: Increase the number of concurrent chunks, since this will improve read and write metrics.
 @dataclass
 class Writer:
     compressor: Any
@@ -39,11 +38,11 @@ class Writer:
     _previous_branch_id: str
 
     @classmethod
-    def new(cls) -> Self:
+    def new(cls, quality: int = 6) -> Self:
         return cls(
             brotli.Compressor(
                 mode=brotli.MODE_TEXT,
-                quality=11,
+                quality=quality,
                 lgwin=24,
                 lgblock=0,
             ),
@@ -292,8 +291,7 @@ class EntryReader(Reader):
 class ChunkCompressor:
     # TODO: when we do the assignments we should pop from a list, so that we ensure we are using all of our active chunks. Then when we create a new list, we order it by the current size. Or, we have a list and we get the one from the list which is smallest currently, then pop.
 
-    # TODO: Change the chunk size default to something fucking reasonable
-    def __init__(self, num_simultaneous_chunks: int = 8, chunk_size: int = 2**32):
+    def __init__(self, num_simultaneous_chunks: int = 32, chunk_size: int = 2**24):
         self.num_simultaneous_chunks = num_simultaneous_chunks
         self.entry_compressors = {
             _generate_id("ec"): EntryWriter.new()
