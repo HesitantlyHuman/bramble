@@ -43,7 +43,7 @@ class TreeLogger:
     def __init__(
         self,
         logging_backend: BrambleBackend,
-        name: str = "entry",
+        name: str = "root",
         debounce: float = 0.25,
         batch_size: int = 50,
         silent: bool = False,
@@ -72,6 +72,7 @@ class TreeLogger:
             logging_tasks: Dict[str, List[LogEntry]] = None
             metadata_tasks: Dict[str, Dict[str, Any]] = None
             branch_creation_tasks: Set[Tuple[str, str]] = None
+            branch_closing_tasks: Set[str] = None
 
             deadline = None
 
@@ -84,6 +85,7 @@ class TreeLogger:
                             logging_tasks,
                             metadata_tasks,
                             branch_creation_tasks,
+                            branch_closing_tasks,
                         ]
                         if item is not None
                     ]
@@ -100,8 +102,7 @@ class TreeLogger:
                     deadline = time.time() + self._debounce
 
                 if task is not None and len(task) > 0:
-                    task_type = task[0]
-                    match task_type:
+                    match task[0]:
                         case 0:
                             _, branch_id, log_entry = task
 
@@ -144,6 +145,13 @@ class TreeLogger:
                                 branch_creation_tasks = set()
 
                             branch_creation_tasks.add((branch_id, name))
+                        case 5:
+                            _, branch_id = task
+
+                            if not branch_closing_tasks:
+                                branch_closing_tasks = set()
+
+                            branch_closing_tasks.add(branch_id)
 
                 if (
                     time.time() > deadline
@@ -173,6 +181,9 @@ class TreeLogger:
                         )
 
                     await asyncio.gather(*todo)
+
+                    if branch_closing_tasks:
+                        await self.logging_writer.close_branches(branch_closing_tasks)
 
                     logging_tasks, metadata_tasks, branch_creation_tasks = (
                         None,
@@ -250,6 +261,9 @@ class TreeLogger:
     def _create_branch(self, branch_id: str, name: str) -> None:
         self._tasks.put((4, branch_id, name))
 
+    def _close_branch(self, branch_id: str) -> None:
+        self._tasks.put((5, branch_id))
+
     def __enter__(self):
         current_logger_ids = _CURRENT_BRANCH_IDS.get()
 
@@ -291,6 +305,7 @@ class TreeLogger:
         while keys_to_delete:
             next_key_to_delete = keys_to_delete.pop()
             try:
+                _LIVE_BRANCHES
                 logger_to_delete = _LIVE_BRANCHES.pop(next_key_to_delete)
                 keys_to_delete.extend(logger_to_delete.children)
             except KeyError:
@@ -433,6 +448,10 @@ class LogBranch:
         self.metadata.update(metadata)
         self.tree_logger._update_metadata(self.id, self.metadata)
 
+    # TODO: This also needs to remove from the live branches, somehow
+    def close(self) -> None:
+        self.tree_logger._close_branch(self.id)
+
     def __repr__(self):
         return f"LogBranch(id={self.id}, name={self.name}, parent={self.parent}, children={self.children}, tags={self.tags}, metadata={self.metadata})"
 
@@ -441,6 +460,7 @@ class LogBranch:
         self._logging_context.__enter__()
 
     def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
         self._logging_context.__exit__(exc_type, exc_value, traceback)
 
 
@@ -461,3 +481,4 @@ class _LoggingContext:
 
     def __exit__(self, exc_type, exc_value, traceback):
         _CURRENT_BRANCH_IDS.set(self._prev_logger_ids)
+        # TODO: We can drop things from the live branches here, because the only place where live branches is read, rather than just things deleted from it, is in the context context function. And that only needs the current branch IDs, which will be gone after this.

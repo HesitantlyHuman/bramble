@@ -175,7 +175,7 @@ class BrambleWriter:
             if item[0] == branch_id
         }
 
-    async def close_branches(self, branch_ids: List[str]) -> None:
+    async def close_branches(self, branch_ids: Set[str]) -> None:
         """Mark branches as closed."""
         for branch_id in branch_ids:
             self._close_branch(branch_id=branch_id)

@@ -54,12 +54,7 @@ def log(
         entry_metadata=entry_metadata,
     )
 
-    current_branch_ids = _CURRENT_BRANCH_IDS.get()
-    if current_branch_ids is None:
-        return
-
-    for branch_id in current_branch_ids:
-        branch = _LIVE_BRANCHES[branch_id]
+    for branch in context():
         branch.log(
             message=message,
             message_type=message_type,
@@ -161,6 +156,7 @@ def context(*args: List[LogBranch] | None) -> List[LogBranch]:
 
             current_branch_ids = _CURRENT_BRANCH_IDS.get()
             for id in current_branch_ids:
+                # TODO: What should we do if this fails?
                 branches.append(_LIVE_BRANCHES[id])
 
             return branches

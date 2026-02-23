@@ -28,9 +28,6 @@ def _pack_compress_flush(compressor: Any, input: Any) -> bytes:
     return data
 
 
-# TODO: We should set a max on how uneven we assign the chunks. We don't want all the branches with the same name in the same chunk, if there is a ton, because then we create a big ol linked bunch that will use up a whole bunch of chunks.
-
-
 @dataclass
 class Writer:
     compressor: Any
