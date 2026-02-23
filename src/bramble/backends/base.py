@@ -141,15 +141,18 @@ class BrambleBackend:
         """
         return self.set_active_chunks(chunk_ids=chunk_ids)
 
-    def get_branch_ids(self, num_ids: int = None) -> Generator[str, None, None]:
+    def get_branch_ids(
+        self, start: int = 0, stop: int = None
+    ) -> Generator[str, None, None]:
         """Get branch IDs from the master list.
 
-        Gets the most recent `num_ids` branch IDs from the master list. If
-        `num_ids` is `None`, `get_branch_ids` will get all of the branch IDs
-        from the master list.
+        Gets the most recent branch IDs from the master list. If `stop` is
+        `None`, `get_branch_ids` will get all of the branch IDs from the master
+        list, starting from `start`.
 
         Args:
-            num_ids (int): The number of IDs to get from the master list.
+            start (int): Index of the first ID to retrieve.
+            stop (int): Index of the last ID to retrieve.
 
         Returns:
             (Generator[str, None, None]): A generator yielding the ordered
@@ -158,22 +161,23 @@ class BrambleBackend:
         raise NotImplementedError(f"{type(self)} does not implement `get_branch_ids`!")
 
     async def async_get_branch_ids(
-        self, num_ids: int = None
+        self, start: int = 0, stop: int = None
     ) -> Generator[str, None, None]:
         """Get branch IDs from the master list.
 
-        Gets the most recent `num_ids` branch IDs from the master list. If
-        `num_ids` is `None`, `async_get_branch_ids` will get all of the branch
-        IDs from the master list.
+        Gets the most recent branch IDs from the master list. If `stop` is
+        `None`, `async_get_branch_ids` will get all of the branch IDs from the
+        master list, starting from `start`.
 
         Args:
-            num_ids (int): The number of IDs to get from the master list.
+            start (int): Index of the first ID to retrieve.
+            stop (int): Index of the last ID to retrieve.
 
         Returns:
             (Generator[str, None, None]): A generator yielding the ordered
                 branch IDs.
         """
-        return self.get_branch_ids(num_ids=num_ids)
+        return self.get_branch_ids(start=start, stop=stop)
 
     def get_chunk_ids(
         self, branch_ids: Sequence[str], type: str
