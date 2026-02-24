@@ -370,6 +370,8 @@ class LogBranch:
         self.children = set()
         self.tags = set()
         self.metadata = {"name": name}
+        # TODO: How do we do this without making the metadata huge?
+        self._tracking = {"start": None, "stop": None, "num_entries": None}
 
         self.tree_logger = tree_logger
 
