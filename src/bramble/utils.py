@@ -1,9 +1,31 @@
 from typing import Dict, Tuple, List
 
+import os
 import uuid
+import inspect
 import traceback
 
 from bramble.log_objects import MessageType
+
+
+# TODO: Add location info option for logging
+def _get_location_info(
+    stack_offset: int, context: int = 5
+) -> Dict[str, int | str] | None:
+    current_frame = inspect.currentframe()
+
+    for _ in range(stack_offset):
+        current_frame = current_frame.f_back
+        if current_frame is None:
+            return None
+
+    info = inspect.getframeinfo(current_frame, context=context)
+    return {
+        "file": os.path.basename(info.filename),
+        "line": info.lineno,
+        "function": info.function,
+        "context": "".join(info.code_context),
+    }
 
 
 def _generate_id(prefix: str = None) -> str:
