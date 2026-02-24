@@ -14,7 +14,7 @@ from bramble.writer import BrambleWriter
 
 class _FakeCompressor:
     """
-    Minimal stand-in for EntryWriter / MetadataWriter instances.
+    Minimal stand-in for EntryCompressor / MetadataCompressor instances.
 
     The real compressors return bytes; we do the same, but we do NOT depend on
     LogEntry internals (keeps these tests stable across log object changes).
@@ -30,14 +30,14 @@ class _FakeCompressor:
         return self._prefix + branch_id.encode("utf-8") + b"|"
 
 
-class _FakeEntryWriter:
+class _FakeEntryCompressor:
     @staticmethod
     def new(*, quality: int):
         # quality is accepted but ignored in the fake
         return _FakeCompressor(prefix=b"E:")
 
 
-class _FakeMetadataWriter:
+class _FakeMetadataCompressor:
     @staticmethod
     def new(*, quality: int):
         return _FakeCompressor(prefix=b"M:")
@@ -87,13 +87,13 @@ def id_gen(monkeypatch):
 @pytest.fixture
 def patched_compressors(monkeypatch):
     """
-    Replace EntryWriter/MetadataWriter factories with fakes so we don't depend on
+    Replace EntryCompressor/MetadataCompressor factories with fakes so we don't depend on
     compression internals or LogEntry structure.
     """
     import bramble.writer as writer_mod
 
-    monkeypatch.setattr(writer_mod, "EntryWriter", _FakeEntryWriter)
-    monkeypatch.setattr(writer_mod, "MetadataWriter", _FakeMetadataWriter)
+    monkeypatch.setattr(writer_mod, "EntryCompressor", _FakeEntryCompressor)
+    monkeypatch.setattr(writer_mod, "MetadataCompressor", _FakeMetadataCompressor)
 
 
 @pytest.fixture

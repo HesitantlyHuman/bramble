@@ -30,7 +30,7 @@ def _pack_compress_flush(compressor: Any, input: Any) -> bytes:
 
 # TODO: we may want to rename this, since we have something else named writer
 @dataclass
-class Writer:
+class BrambleCompressor:
     compressor: Any
 
     _previous_branch_id: str
@@ -51,7 +51,7 @@ class Writer:
 
 
 @dataclass
-class Reader:
+class BrambleDecompressor:
     decompressor: Any
     byte_source: ByteSource
 
@@ -75,7 +75,7 @@ class Reader:
         return uncompressed
 
 
-class MetadataWriter(Writer):
+class MetadataCompressor(BrambleCompressor):
     def add(
         self,
         branch_id: str,
@@ -112,7 +112,7 @@ class MetadataWriter(Writer):
         return data
 
 
-class EntryWriter(Writer):
+class EntryCompressor(BrambleCompressor):
     def add(self, branch_id: str, entry: LogEntry) -> bytes:
         data = b""
 
@@ -141,7 +141,7 @@ class EntryWriter(Writer):
         return data
 
 
-class MetadataReader(Reader):
+class MetadataDecompressor(BrambleDecompressor):
     def read_next(
         self,
     ) -> Tuple[
@@ -228,7 +228,7 @@ class MetadataReader(Reader):
             next_item = self.read_next()
 
 
-class EntryReader(Reader):
+class EntryDecompressor(BrambleDecompressor):
     def read_next(self) -> Tuple[str, LogEntry]:
         initial = self.byte_source.read(PREFIX_SIZE)
         if len(initial) == 0:
@@ -283,74 +283,3 @@ class EntryReader(Reader):
 
 
 # TODO: Change all internal representations of children and tags to be sets. Keep external interfaces using lists, for simplicity.
-
-
-if __name__ == "__main__":
-    from bramble.utils import _generate_id
-
-    example_entry = LogEntry(
-        """Here is a message that we want to have saved and compressed, because otherwise our logs become too large and unwieldy! Here is a message that we want to have saved and compressed, because otherwise our logs become too large and unwieldy!""",
-        112340.2345,
-        MessageType.USER,
-        entry_metadata=None,
-    )
-
-    data = b""
-    writer = EntryWriter.new()
-    id = _generate_id()
-    print(id)
-
-    for _ in range(3):
-        next_bytes = writer.add(id, example_entry)
-        data += next_bytes
-        print(len(next_bytes))
-
-    id = _generate_id()
-    for _ in range(2):
-        next_bytes = writer.add(id, example_entry)
-        data += next_bytes
-        print(len(next_bytes))
-
-    reader = EntryReader.new(data)
-    for branch_id, log_entry in reader.read():
-        print(branch_id, log_entry)
-
-    writer = MetadataWriter.new()
-
-    data = b""
-    id = _generate_id()
-    data += writer.add(
-        id,
-        "parent",
-        ["a", "b", "c"],
-        ["tag_a", "tag-b"],
-        {"key": "value", "another": 235},
-    )
-    data += writer.add(
-        id,
-        None,
-        ["d"],
-        None,
-        {"another": 244},
-    )
-    print(len(data))
-    data += writer.add(
-        _generate_id(),
-        "parent",
-        ["a", "b", "c"],
-        ["tag_a", "tag-b"],
-        {"key": "value", "another": 235},
-    )
-    print(len(data))
-    data += writer.add(
-        _generate_id(),
-        "parent",
-        ["a", "b", "c"],
-        ["tag_a", "tag-b"],
-        {"key": "value", "another": 235},
-    )
-    print(len(data))
-
-    reader = MetadataReader.new(data)
-    for output in reader.read():
-        print(output)

@@ -5,7 +5,7 @@ import asyncio
 from bramble.utils import _generate_id
 from bramble.log_objects import LogEntry
 from bramble.backends.base import BrambleBackend
-from bramble.compression import EntryWriter, MetadataWriter, Writer
+from bramble.compression import EntryCompressor, MetadataCompressor, BrambleCompressor
 
 
 # TODO: Add support for loading the active chunks
@@ -78,11 +78,11 @@ class BrambleWriter:
         self.compression_quality = compression_quality
 
         self._entry_compressors = {
-            _generate_id("ec"): EntryWriter.new(quality=compression_quality)
+            _generate_id("ec"): EntryCompressor.new(quality=compression_quality)
             for _ in range(self.num_simultaneous_chunks)
         }
         self._meta_compressors = {
-            _generate_id("mc"): MetadataWriter.new(quality=compression_quality)
+            _generate_id("mc"): MetadataCompressor.new(quality=compression_quality)
             for _ in range(self.num_simultaneous_chunks)
         }
 
@@ -116,7 +116,7 @@ class BrambleWriter:
         self,
         branch_id: str,
         name: str,
-        compressors: Dict[str, Writer],
+        compressors: Dict[str, BrambleCompressor],
         id_to_compressor_map: Dict[str, str],
         name_to_compressor_map: Dict[str, Set[str]],
         chunk_to_ids_and_names: Dict[int, Set[Tuple[str, str]]],
@@ -288,8 +288,8 @@ class BrambleWriter:
         self,
         item_iterable: Iterable[Tuple[str, Any]],
         compression_function: Callable[[str, str, Any], bytes],
-        compressor_creation_function: Callable[[], Tuple[str, Writer]],
-        compressors: Dict[str, Writer],
+        compressor_creation_function: Callable[[], Tuple[str, BrambleCompressor]],
+        compressors: Dict[str, BrambleCompressor],
         id_to_compressor_map: Dict[str, str],
         name_to_compressor_map: Dict[str, Set[str]],
         chunk_to_ids_and_names: Dict[str, Set[Tuple[str, str]]],
@@ -351,8 +351,10 @@ class BrambleWriter:
                 branch_id=branch_id, entry=log_entry
             )
 
-        def _create_compressor() -> Tuple[str, EntryWriter]:
-            return _generate_id("ec"), EntryWriter.new(quality=self.compression_quality)
+        def _create_compressor() -> Tuple[str, EntryCompressor]:
+            return _generate_id("ec"), EntryCompressor.new(
+                quality=self.compression_quality
+            )
 
         await self._build_and_write_chunks(
             item_iterable=iter(entries.items()),
@@ -415,8 +417,8 @@ class BrambleWriter:
                 metadata=metadata,
             )
 
-        def _create_compressor() -> Tuple[str, MetadataWriter]:
-            return _generate_id("mc"), MetadataWriter.new(
+        def _create_compressor() -> Tuple[str, MetadataCompressor]:
+            return _generate_id("mc"), MetadataCompressor.new(
                 quality=self.compression_quality
             )
 
