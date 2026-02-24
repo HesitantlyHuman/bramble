@@ -47,7 +47,6 @@ class TreeLogger:
         batch_size: int = 50,
         silent: bool = False,
     ):
-        # TODO: Should this be duck typed? But I do want to check it before we get into the run function
         if not isinstance(writer, BrambleWriter):
             raise ValueError(
                 f"`writer` must be of type `BrambleWriter`, received {type(writer)}."
@@ -78,7 +77,7 @@ class TreeLogger:
         batch_size: int = 50,
         silent: bool = False,
         num_simultaneous_chunks: int = 32,
-        chunk_size: int = 2**24,
+        chunk_size_mb: int = 16,
         compression_quality: int = 6,
         max_assignment_imbalance_factor: float = 3.0,
         base_assignment_imbalance_num: int = 10,
@@ -86,7 +85,7 @@ class TreeLogger:
         writer = BrambleWriter(
             backend=backend,
             num_simultaneous_chunks=num_simultaneous_chunks,
-            chunk_size=chunk_size,
+            chunk_size_mb=chunk_size_mb,
             compression_quality=compression_quality,
             max_assignment_imbalance_factor=max_assignment_imbalance_factor,
             base_assignment_imbalance_num=base_assignment_imbalance_num,
@@ -514,6 +513,7 @@ class LogBranch:
             pass
 
 
+# TODO: Add pytesting for the closing functionality
 class _LoggingContext:
     _prev_logger_ids: Set[str]
     _new_branches: List[LogBranch]
