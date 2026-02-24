@@ -1,4 +1,5 @@
-from typing import Set, Dict, List, Any, Tuple
+# TODO: Alphabetize and order imports
+from typing import Set, Dict, List, Any, Tuple, Self
 
 import contextvars
 import threading
@@ -25,8 +26,7 @@ _ENABLED: contextvars.ContextVar[bool] = contextvars.ContextVar(
 )
 
 
-# TODO: figure out how to nicely expose the BrambleWriter parameters
-# TODO: Add closing of branches!!!
+# TODO: Update documentation
 class TreeLogger:
     """A branching logger for async processes.
 
@@ -36,28 +36,29 @@ class TreeLogger:
     """
 
     root: "LogBranch"
-    logging_backend: BrambleBackend
-    logging_writer: BrambleWriter
+    writer: BrambleWriter
     silent: bool
 
     def __init__(
         self,
-        logging_backend: BrambleBackend,
+        writer: BrambleWriter,
         name: str = "root",
         debounce: float = 0.25,
         batch_size: int = 50,
         silent: bool = False,
     ):
-        if not isinstance(logging_backend, BrambleBackend):
+        # TODO: Should this be duck typed? But I do want to check it before we get into the run function
+        if not isinstance(writer, BrambleWriter):
             raise ValueError(
-                f"`logging_backend` must be of type `BrambleBackend`, received {type(logging_backend)}."
+                f"`writer` must be of type `BrambleWriter`, received {type(writer)}."
             )
 
         if not isinstance(name, str):
             raise ValueError(f"`name` must be of type `str`, received {type(name)}.")
 
-        self.logging_backend = logging_backend
-        self.logging_writer = BrambleWriter(self.logging_backend)
+        # TODO: validate other input types?
+
+        self.writer = writer
         self.silent = silent
 
         self._tasks = queue.SimpleQueue()
@@ -66,6 +67,37 @@ class TreeLogger:
 
         self.root = LogBranch(name=name, tree_logger=self)
         hook_logging()
+
+    # Doing this with kwargs may improve the maintainability of the code, but I do like getting the type hints.
+    @classmethod
+    def from_backend(
+        cls,
+        backend: BrambleBackend,
+        name: str = "root",
+        debounce: float = 0.25,
+        batch_size: int = 50,
+        silent: bool = False,
+        num_simultaneous_chunks: int = 32,
+        chunk_size: int = 2**24,
+        compression_quality: int = 6,
+        max_assignment_imbalance_factor: float = 3.0,
+        base_assignment_imbalance_num: int = 10,
+    ) -> Self:
+        writer = BrambleWriter(
+            backend=backend,
+            num_simultaneous_chunks=num_simultaneous_chunks,
+            chunk_size=chunk_size,
+            compression_quality=compression_quality,
+            max_assignment_imbalance_factor=max_assignment_imbalance_factor,
+            base_assignment_imbalance_num=base_assignment_imbalance_num,
+        )
+        return cls(
+            writer=writer,
+            name=name,
+            debounce=debounce,
+            batch_size=batch_size,
+            silent=silent,
+        )
 
     def run(self):
         async def _run():
@@ -116,9 +148,9 @@ class TreeLogger:
                             if not metadata_tasks:
                                 metadata_tasks = {}
 
-                            metadata_tasks.setdefault(branch_id, {})["parent"] = parent
-                            metadata_tasks.setdefault(branch_id, {}).setdefault(
-                                "children", set()
+                            metadata_tasks.setdefault("parents", {})[branch_id] = parent
+                            metadata_tasks.setdefault("children", {}).setdefault(
+                                branch_id, set()
                             ).update(children)
                         case 2:
                             _, branch_id, metadata = task
@@ -126,8 +158,8 @@ class TreeLogger:
                             if not metadata_tasks:
                                 metadata_tasks = {}
 
-                            metadata_tasks.setdefault(branch_id, {}).setdefault(
-                                "metadata", {}
+                            metadata_tasks.setdefault("metadata", {}).setdefault(
+                                branch_id, {}
                             ).update(metadata)
                         case 3:
                             _, branch_id, tags = task
@@ -135,8 +167,8 @@ class TreeLogger:
                             if not metadata_tasks:
                                 metadata_tasks = {}
 
-                            metadata_tasks.setdefault(branch_id, {}).setdefault(
-                                "tags", set()
+                            metadata_tasks.setdefault("tags", {}).setdefault(
+                                branch_id, set()
                             ).update(tags)
                         case 4:
                             _, branch_id, name = task
@@ -159,31 +191,31 @@ class TreeLogger:
                     or task is None
                 ):
                     if branch_creation_tasks:
-                        await self.logging_writer.add_branches(branch_creation_tasks)
+                        await self.writer.add_branches(branch_creation_tasks)
 
                     todo = []
 
                     if logging_tasks:
                         todo.append(
-                            self.logging_writer.append_entries(
+                            self.writer.append_entries(
                                 entries=logging_tasks,
                             )
                         )
 
                     if metadata_tasks:
                         todo.append(
-                            self.logging_writer.update_branch_info(
-                                parents=metadata_tasks["parent"],
-                                children=metadata_tasks["children"],
-                                tags=metadata_tasks["tags"],
-                                metadata=metadata_tasks["metadata"],
+                            self.writer.update_branch_info(
+                                parents=metadata_tasks.get("parents"),
+                                children=metadata_tasks.get("children"),
+                                tags=metadata_tasks.get("tags"),
+                                metadata=metadata_tasks.get("metadata"),
                             )
                         )
 
                     await asyncio.gather(*todo)
 
                     if branch_closing_tasks:
-                        await self.logging_writer.close_branches(branch_closing_tasks)
+                        await self.writer.close_branches(branch_closing_tasks)
 
                     logging_tasks, metadata_tasks, branch_creation_tasks = (
                         None,
@@ -305,7 +337,6 @@ class TreeLogger:
         while keys_to_delete:
             next_key_to_delete = keys_to_delete.pop()
             try:
-                _LIVE_BRANCHES
                 logger_to_delete = _LIVE_BRANCHES.pop(next_key_to_delete)
                 keys_to_delete.extend(logger_to_delete.children)
             except KeyError:
@@ -448,9 +479,22 @@ class LogBranch:
         self.metadata.update(metadata)
         self.tree_logger._update_metadata(self.id, self.metadata)
 
-    # TODO: This also needs to remove from the live branches, somehow
+    # TODO: document function
     def close(self) -> None:
         self.tree_logger._close_branch(self.id)
+
+        # Prevent the branch from being logged to again
+        try:
+            _LIVE_BRANCHES.pop(self.id)
+        except KeyError:
+            pass
+
+        try:
+            current_branch_ids = _CURRENT_BRANCH_IDS.get()
+            current_branch_ids.remove(self.id)
+            _CURRENT_BRANCH_IDS.set(current_branch_ids)
+        except KeyError:
+            pass
 
     def __repr__(self):
         return f"LogBranch(id={self.id}, name={self.name}, parent={self.parent}, children={self.children}, tags={self.tags}, metadata={self.metadata})"
@@ -462,6 +506,12 @@ class LogBranch:
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
         self._logging_context.__exit__(exc_type, exc_value, traceback)
+
+    def __del__(self):
+        try:
+            self.close()
+        except:
+            pass
 
 
 class _LoggingContext:
@@ -480,5 +530,11 @@ class _LoggingContext:
         _CURRENT_BRANCH_IDS.set({branch.id for branch in self._new_branches})
 
     def __exit__(self, exc_type, exc_value, traceback):
+        # Cleanup branches from _LIVE_BRANCHES, so that they can be released
+        for branch_id in _CURRENT_BRANCH_IDS.get():
+            try:
+                _LIVE_BRANCHES.pop(branch_id)
+            except KeyError:
+                pass
+
         _CURRENT_BRANCH_IDS.set(self._prev_logger_ids)
-        # TODO: We can drop things from the live branches here, because the only place where live branches is read, rather than just things deleted from it, is in the context context function. And that only needs the current branch IDs, which will be gone after this.

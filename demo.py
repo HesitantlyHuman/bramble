@@ -63,8 +63,8 @@ def sync_inside():
 
 
 # logging_writer = bramble.backends.FileWriter("test")
-logging_writer = bramble.backends.RedisWriter.from_socket("127.0.0.1", "6379")
-with bramble.TreeLogger(logging_backend=logging_writer):
+logging_backend = bramble.backends.RedisBackend.from_socket("127.0.0.1", "6379")
+with bramble.TreeLogger.from_backend(backend=logging_backend):
     entry_function()
 
 # No logging, all treelog functions are no-ops if there is not a logger

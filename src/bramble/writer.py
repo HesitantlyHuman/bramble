@@ -11,7 +11,7 @@ from bramble.compression import EntryWriter, MetadataWriter, Writer
 # TODO: Document functions, settings
 # TODO: Add support for loading the active chunks
 class BrambleWriter:
-    bramble_backend: BrambleBackend
+    backend: BrambleBackend
     num_simultaneous_chunks: int
     chunk_size: int
     compression_quality: int
@@ -20,14 +20,14 @@ class BrambleWriter:
 
     def __init__(
         self,
-        bramble_backend: BrambleBackend,
+        backend: BrambleBackend,
         num_simultaneous_chunks: int = 32,
         chunk_size: int = 2**24,
         compression_quality: int = 6,
         max_assignment_imbalance_factor: float = 3.0,
         base_assignment_imbalance_num: int = 10,
     ):
-        self.bramble_backend = bramble_backend
+        self.backend = backend
         self.num_simultaneous_chunks = num_simultaneous_chunks
         self.chunk_size = chunk_size
         self.max_assignment_imbalance_factor = max_assignment_imbalance_factor
@@ -143,11 +143,11 @@ class BrambleWriter:
             ids_and_names=ids_and_names
         )
         ids_to_add = set([item[0] for item in ids_and_names])
-        master_list_task = self.bramble_backend.async_add_branches(ids_to_add)
-        entry_assignment_task = self.bramble_backend.async_assign_chunks(
+        master_list_task = self.backend.async_add_branches(ids_to_add)
+        entry_assignment_task = self.backend.async_assign_chunks(
             branch_chunks=entry_chunk_assignments, chunk_type="ec"
         )
-        meta_assignment_task = self.bramble_backend.async_assign_chunks(
+        meta_assignment_task = self.backend.async_assign_chunks(
             branch_chunks=meta_chunk_assignments, chunk_type="mc"
         )
 
@@ -229,7 +229,7 @@ class BrambleWriter:
                     name_to_compressor_map[name_to_transfer].remove(chunk_id)
                     name_to_compressor_map[name_to_transfer].add(new_chunk_id)
 
-        chunk_sizes = await self.bramble_backend.async_append_data(
+        chunk_sizes = await self.backend.async_append_data(
             chunk_data=logging_data_by_chunk
         )
         self._chunk_sizes.update(chunk_sizes)

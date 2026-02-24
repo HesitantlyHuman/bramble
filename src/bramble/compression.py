@@ -28,6 +28,7 @@ def _pack_compress_flush(compressor: Any, input: Any) -> bytes:
     return data
 
 
+# TODO: we may want to rename this, since we have something else named writer
 @dataclass
 class Writer:
     compressor: Any

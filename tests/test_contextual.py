@@ -12,8 +12,14 @@ from bramble.loggers import TreeLogger, LogBranch
 from bramble.wrapper import branch
 
 
+# ----------------------------
+# Test helpers
+# ----------------------------
+
+
 class MockWriter(BrambleWriter):
     def __init__(self):
+        # Writer API (async)
         self.add_branches = AsyncMock()
         self.close_branches = AsyncMock()
         self.append_entries = AsyncMock()
@@ -21,13 +27,20 @@ class MockWriter(BrambleWriter):
 
 
 @pytest.fixture
-def mock_backend():
+def mock_writer():
     return MockWriter()
 
 
+# Keep the fixture name `mock_backend` to minimize test signature churn.
+# It now returns a writer, since TreeLogger no longer speaks to the backend directly.
 @pytest.fixture
-def simple_logger(mock_backend):
-    tree_logger = TreeLogger(logging_backend=mock_backend)
+def mock_backend(mock_writer):
+    return mock_writer
+
+
+@pytest.fixture
+def simple_logger(mock_writer):
+    tree_logger = TreeLogger(writer=mock_writer)
     tree_logger.run = lambda *_, **__: None
     with tree_logger:
         yield tree_logger
@@ -38,15 +51,28 @@ def log_branch(simple_logger):
     return simple_logger.root
 
 
+def _get_field(obj, name, default=None):
+    """Access dict keys or object attributes uniformly."""
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return getattr(obj, name, default)
+
+
+# ----------------------------
+# Tests
+# ----------------------------
+
+
 def test_log_adds_entry_to_active_branch(mock_backend):
     captured_entries = {}
 
     async def capture_entries(entries):
+        # entries is expected to be a dict like {branch_id: [LogEntry, ...], ...}
         captured_entries.update(entries)
 
-    mock_backend.async_append_entries.side_effect = capture_entries
+    mock_backend.append_entries.side_effect = capture_entries
 
-    with TreeLogger(logging_backend=mock_backend) as logger:
+    with TreeLogger(writer=mock_backend) as logger:
         log("hello world", MessageType.USER, {"info": 1})
 
     # Ensure one branch got one log entry
@@ -63,39 +89,41 @@ def test_apply_adds_tags_and_metadata(mock_backend):
     captured_tags = {}
     captured_metadata = {}
 
-    async def capture_tags(tags):
-        captured_tags.update(tags)
+    async def capture_branch_info(parents, children, tags, metadata):
+        if tags:
+            for branch_id, branch_tags in tags.items():
+                captured_tags.setdefault(branch_id, set()).update(branch_tags)
 
-    async def capture_metadata(metadata):
-        captured_metadata.update(metadata)
+        if metadata:
+            for branch_id, branch_metadata in metadata.items():
+                captured_metadata.setdefault(branch_id, {}).update(branch_metadata)
 
-    mock_backend.async_add_tags.side_effect = capture_tags
-    mock_backend.async_update_branch_metadata.side_effect = capture_metadata
+    mock_backend.update_branch_info.side_effect = capture_branch_info
 
-    with TreeLogger(logging_backend=mock_backend) as logger:
+    with TreeLogger(writer=mock_backend) as logger:
         apply(["tag1", "tag2"], {"key": "val"})
 
-    # Validate both were called for the same branch
+    # Validate both were applied for the same branch
     assert len(captured_tags) == 1
     assert len(captured_metadata) == 1
 
     branch_id = next(iter(captured_tags.keys()))
     assert branch_id in captured_metadata
 
-    assert set(captured_tags[branch_id]) == {"tag1", "tag2"}
-    assert captured_metadata[branch_id] == {"name": "entry", "key": "val"}
+    assert captured_tags[branch_id] == {"tag1", "tag2"}
+    assert captured_metadata[branch_id] == {"name": "root", "key": "val"}
 
 
 def test_branch_decorator_creates_new_branch(mock_backend):
-    # Track entries passed to backend
+    # Track entries passed to writer
     received_entries = {}
 
     async def capture_entries(entries):
         received_entries.update(entries)
 
-    mock_backend.async_append_entries.side_effect = capture_entries
+    mock_backend.append_entries.side_effect = capture_entries
 
-    with TreeLogger(logging_backend=mock_backend) as logger:
+    with TreeLogger(writer=mock_backend) as logger:
         calls = []
 
         @branch(["sync"], {"origin": "test"})
@@ -110,15 +138,15 @@ def test_branch_decorator_creates_new_branch(mock_backend):
 
 
 def test_async_branch_decorator_creates_new_branch(mock_backend):
-    # Track entries passed to backend
+    # Track entries passed to writer
     received_entries = {}
 
     async def capture_entries(entries):
         received_entries.update(entries)
 
-    mock_backend.async_append_entries.side_effect = capture_entries
+    mock_backend.append_entries.side_effect = capture_entries
 
-    with TreeLogger(logging_backend=mock_backend) as logger:
+    with TreeLogger(writer=mock_backend) as logger:
         calls = []
 
         @branch(["async"], {"kind": "test"})
@@ -151,7 +179,8 @@ def test_branch_decorator_logs_exceptions(simple_logger):
     while not simple_logger._tasks.empty():
         candidate = simple_logger._tasks.get_nowait()
         if (
-            isinstance(candidate[2], LogEntry)
+            len(candidate) > 2
+            and isinstance(candidate[2], LogEntry)
             and candidate[2].message_type == MessageType.ERROR
         ):
             task = candidate
@@ -224,21 +253,28 @@ def test_apply_combines_args_correctly(mock_backend):
     captured_metadata = {}
     captured_tags = {}
 
-    async def capture_tags(tags):
-        captured_tags.update(tags)
+    async def capture_branch_info(parents, children, tags, metadata):
+        print(parents, children, tags, metadata)
+        if tags:
+            for branch_id, branch_tags in tags.items():
+                captured_tags.setdefault(branch_id, set()).update(branch_tags)
 
-    async def capture_metadata(metadata):
-        captured_metadata.update(metadata)
+        if metadata:
+            for branch_id, branch_metadata in metadata.items():
+                captured_metadata.setdefault(branch_id, {}).update(branch_metadata)
 
-    mock_backend.async_add_tags.side_effect = capture_tags
-    mock_backend.async_update_branch_metadata.side_effect = capture_metadata
+    mock_backend.update_branch_info.side_effect = capture_branch_info
 
-    with TreeLogger(logging_backend=mock_backend) as logger:
+    with TreeLogger(writer=mock_backend) as logger:
         root = logger.root
         with context([root]):
             apply(["a", "b"], ["b", "c"], {"x": 1}, {"x": 2})
 
-    assert set(captured_tags[root.id]) == {"a", "b", "c"}
+    print(root.id)
+    print(captured_tags)
+    print(captured_metadata)
+
+    assert captured_tags[root.id] == {"a", "b", "c"}
     assert captured_metadata[root.id]["x"] == 2
 
 
@@ -300,9 +336,9 @@ def test_disable_suppresses_logging(mock_backend):
     async def capture_entries(entries):
         captured_entries.update(entries)
 
-    mock_backend.async_append_entries.side_effect = capture_entries
+    mock_backend.append_entries.side_effect = capture_entries
 
-    with TreeLogger(logging_backend=mock_backend) as logger:
+    with TreeLogger(writer=mock_backend) as logger:
         with disable():
             log("this should not log")
         assert captured_entries == {}
@@ -312,6 +348,6 @@ def test_disable_suppresses_logging(mock_backend):
 
 
 def test_enable_reactivates_logging(mock_backend):
-    with TreeLogger(logging_backend=mock_backend) as logger:
+    with TreeLogger(writer=mock_backend) as logger:
         enable()  # should be a no-op if already enabled
         log("still logs")
