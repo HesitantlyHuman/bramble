@@ -376,6 +376,7 @@ class LogBranch:
             id = _generate_id("b")
         self.id = id
 
+        self._closed = False
         self.tree_logger._update_metadata(self.id, self.metadata)
         self.tree_logger._create_branch(self.id, self.name)
 
@@ -395,6 +396,8 @@ class LogBranch:
             entry_metadata (Dict[str, Union[str, int, float, bool]], optional): Metadata
                 to include with the log entry. Defaults to None.
         """
+        if self._closed:
+            raise ValueError(f"Cannot write to a closed bramble LogBranch!")
         self.tree_logger.log(
             self.id,
             message=message,
@@ -402,7 +405,6 @@ class LogBranch:
             entry_metadata=entry_metadata,
         )
 
-    # TODO: typecheck this
     def branch(self, name: str) -> "LogBranch":
         """Create a new branch from the current.
 
@@ -417,6 +419,9 @@ class LogBranch:
         Returns:
             LogBranch: The new `bramble` branch.
         """
+        if not isinstance(name, str):
+            raise ValueError(f"`name` must be a string, received {type(name)}.")
+
         new_branch = LogBranch(
             name=name,
             tree_logger=self.tree_logger,
@@ -479,6 +484,7 @@ class LogBranch:
 
     # TODO: document function
     def close(self) -> None:
+        self._closed = True
         self.tree_logger._close_branch(self.id)
 
         # Prevent the branch from being logged to again
@@ -497,12 +503,12 @@ class LogBranch:
     def __repr__(self):
         return f"LogBranch(id={self.id}, name={self.name}, parent={self.parent}, children={self.children}, tags={self.tags}, metadata={self.metadata})"
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self._logging_context = _LoggingContext(new_branches=[self])
         self._logging_context.__enter__()
+        return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
         self._logging_context.__exit__(exc_type, exc_value, traceback)
 
     def __del__(self):
