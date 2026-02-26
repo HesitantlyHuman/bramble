@@ -179,6 +179,7 @@ class BrambleBackend:
         """
         return self.get_branch_ids(start=start, stop=stop)
 
+    # TODO: change 'type' parameter name to match the setting function
     def get_chunk_ids(
         self, branch_ids: Sequence[str], type: str
     ) -> Mapping[str, Sequence[str]]:

@@ -20,6 +20,8 @@ def _pack_compress_flush(compressor: Any, input: Any) -> bytes:
     match input:
         case str():
             packed = input.encode()
+        case set():
+            packed = msgpack.packb(list(input))
         case _:
             packed = msgpack.packb(input)
 

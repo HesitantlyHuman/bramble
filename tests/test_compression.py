@@ -51,6 +51,17 @@ def test_entry_compressor_produces_bytes():
     assert len(b) > 0
 
 
+def test_metadata_compressor():
+    c = MetadataCompressor.new(quality=6)
+    b = c.add(
+        "b1",
+        parent="p",
+        children=set(["c1", "c2"]),
+        tags=set(["t1", "t2"]),
+        metadata={"x": 1, "ok": True},
+    )
+
+
 def test_metadata_compressor_produces_bytes():
     c = MetadataCompressor.new(quality=6)
     b = c.add(

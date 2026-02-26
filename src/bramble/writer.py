@@ -358,6 +358,10 @@ class BrambleWriter:
         chunk_sizes = await self.backend.async_append_data(
             chunk_data=logging_data_by_chunk
         )
+        if not isinstance(chunk_sizes, dict):
+            raise ValueError(
+                f"`BrambleBackend` of type {type(self.backend)} did not return a dictionary from its append data function!"
+            )
         self._chunk_sizes.update(chunk_sizes)
 
         for chunk_id in chunk_ids_to_cleanup:
@@ -400,8 +404,13 @@ class BrambleWriter:
                 quality=self.compression_quality
             )
 
+        def _iterable():
+            for branch_id, log_entries in entries.items():
+                for log_entry in log_entries:
+                    yield (branch_id, log_entry)
+
         await self._build_and_write_chunks(
-            item_iterable=iter(entries.items()),
+            item_iterable=_iterable(),
             compression_function=_compress,
             compressor_creation_function=_create_compressor,
             compressors=self._entry_compressors,

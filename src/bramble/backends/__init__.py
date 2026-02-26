@@ -19,3 +19,6 @@
 
 #     RedisReader = REDIS_ERROR
 #     RedisWriter = REDIS_ERROR
+
+
+from bramble.backends.memory import MemoryBackend

@@ -44,8 +44,8 @@ async def async_c():
     bramble.log("First message")
 
     # Writing some stuff to a different file, should still write to the original as well
-    logging_writer = bramble.backends.FileWriter("b")
-    with bramble.TreeLogger(logging_writer):
+    logging_backend = bramble.backends.MemoryBackend()
+    with bramble.TreeLogger.from_backend(logging_backend):
         bramble.log("Second message")
         bramble.log("Third message", entry_metadata={"id": "lkefidks"})
 
@@ -63,7 +63,7 @@ def sync_inside():
 
 
 # logging_writer = bramble.backends.FileWriter("test")
-logging_backend = bramble.backends.RedisBackend.from_socket("127.0.0.1", "6379")
+logging_backend = bramble.backends.MemoryBackend()
 with bramble.TreeLogger.from_backend(backend=logging_backend):
     entry_function()
 
