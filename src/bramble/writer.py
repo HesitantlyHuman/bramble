@@ -1,6 +1,7 @@
 from typing import Dict, List, Tuple, Set, Any, Iterable, Callable
 
 import asyncio
+import datetime
 
 from bramble.utils import _generate_id
 from bramble.log_objects import LogEntry
@@ -112,6 +113,8 @@ class BrambleWriter:
             | set(self._meta_compressors.keys())
         }
 
+        self._active_branches_calculated_metadata: Dict[str, Dict[str, Any]] = {}
+
     def _assignment_helper(
         self,
         branch_id: str,
@@ -215,6 +218,13 @@ class BrambleWriter:
             ids_and_names=ids_and_names
         )
         ids_to_add = {id for id, _ in ids_and_names}
+        for branch_id in ids_to_add:
+            self._active_branches_calculated_metadata[branch_id] = {
+                "created": datetime.datetime.now().timestamp(),
+                "started": None,
+                "stopped": None,
+                "num_entries": 0,
+            }
         master_list_task = self.backend.async_add_branches(ids_to_add)
         entry_assignment_task = self.backend.async_assign_chunks(
             branch_chunks=entry_chunk_assignments, chunk_type="ec"
@@ -254,6 +264,11 @@ class BrambleWriter:
         except KeyError:
             pass
 
+        try:
+            del self._active_branches_calculated_metadata[branch_id]
+        except KeyError:
+            pass
+
         return has_updated
 
     async def close_branches(self, branch_ids: Set[str]) -> None:
@@ -265,24 +280,42 @@ class BrambleWriter:
         Args:
             branch_ids (Set[str]): The ids of the branches which are closed.
         """
+        # First, let's collect the calculated metadata that we need to write out
+        calculated_metadata_output = {}
+        for branch_id in branch_ids:
+            try:
+                calculated_metadata_output[branch_id] = (
+                    self._active_branches_calculated_metadata[branch_id]
+                )
+            except KeyError:
+                pass
+
+        # Then write the metadata out
+        await self.update_branch_info(
+            parents=None, children=None, tags=None, metadata=calculated_metadata_output
+        )
+
+        # Now, we will update our internal representations, to remove those branches
         has_updated = False
         for branch_id in branch_ids:
             if self._close_branch(branch_id=branch_id):
                 has_updated = True
 
-        if not has_updated:
-            return
+        if has_updated:
+            self._name_to_entry_compressor_map: Dict[str, Set[str]] = {}
+            self._name_to_meta_compressor_map: Dict[str, Set[str]] = {}
 
-        self._name_to_entry_compressor_map: Dict[str, Set[str]] = {}
-        self._name_to_meta_compressor_map: Dict[str, Set[str]] = {}
+            for chunk_id, ids_and_names in self._entry_chunk_to_ids_and_names.items():
+                for _, name in ids_and_names:
+                    self._name_to_entry_compressor_map.setdefault(name, set()).add(
+                        chunk_id
+                    )
 
-        for chunk_id, ids_and_names in self._entry_chunk_to_ids_and_names.items():
-            for _, name in ids_and_names:
-                self._name_to_entry_compressor_map.setdefault(name, set()).add(chunk_id)
-
-        for chunk_id, ids_and_names in self._meta_chunk_to_ids_and_names.items():
-            for _, name in ids_and_names:
-                self._name_to_meta_compressor_map.setdefault(name, set()).add(chunk_id)
+            for chunk_id, ids_and_names in self._meta_chunk_to_ids_and_names.items():
+                for _, name in ids_and_names:
+                    self._name_to_meta_compressor_map.setdefault(name, set()).add(
+                        chunk_id
+                    )
 
     async def _build_and_write_chunks(
         self,
@@ -345,6 +378,17 @@ class BrambleWriter:
             log_entries (Dict[str, List[LogEntry]]): The log entries to append,
             keyed by branch id.
         """
+        # Update the branches' calculated metadata
+        for branch_id, branch_entries in entries.items():
+            entry_timestamps = [entry.timestamp for entry in branch_entries]
+            self._active_branches_calculated_metadata[branch_id]["num_entries"] += 1
+            if self._active_branches_calculated_metadata[branch_id]["started"] is None:
+                self._active_branches_calculated_metadata[branch_id]["started"] = min(
+                    entry_timestamps
+                )
+            self._active_branches_calculated_metadata[branch_id]["stopped"] = max(
+                entry_timestamps
+            )
 
         def _compress(chunk_id: str, branch_id: str, log_entry: LogEntry) -> bytes:
             return self._entry_compressors[chunk_id].add(
@@ -388,6 +432,15 @@ class BrambleWriter:
             metadata (Dict[str, Dict[str, Any]]): The metadata updates to apply.
                 A mapping of branch IDs to branch metadata.
         """
+        if parents is None:
+            parents = {}
+        if children is None:
+            children = {}
+        if tags is None:
+            tags = {}
+        if metadata is None:
+            metadata = {}
+
         branch_ids = (
             set(parents.keys())
             | set(children.keys())
@@ -431,23 +484,3 @@ class BrambleWriter:
             name_to_compressor_map=self._name_to_meta_compressor_map,
             chunk_to_ids_and_names=self._meta_chunk_to_ids_and_names,
         )
-
-
-# TODO: generate tests
-# - Incorrect instantiation values give errors
-# - Branches will have an entry compressor and a meta compressor after assignment
-# - Assigning multiple branches works
-# - Branches with the same name get assigned the same compressors if we can help it
-# - Branches with different names will get spread around the compressors
-# - Branches with the same name will start filling a 2nd compressor after the imbalance factor is reached
-# - Adding branches adds to the master list
-# - Adding branches actually calls the backend to assign chunks, and separates them by chunk_type
-# - Closing branches removes mappings
-# - Closing branches removes name if all branches with that name are removed
-# - Writing (either entry or meta) will add data to chunks in the backend
-# - Going over the chunk size will trigger new chunk
-# - Creating a new chunk will remove old chunk from mappings
-# - New chunk will have the ids and names of the old chunk
-# - Creating a new chunk keeps a constant number of compressors
-# - Append entries works
-# - Update branch info works

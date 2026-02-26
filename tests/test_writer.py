@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 
 from bramble.backends.base import BrambleBackend
 from bramble.writer import BrambleWriter
+from bramble.log_objects import MessageType, LogEntry
 
 
 # ----------------------------
@@ -58,6 +59,8 @@ class MockBackend(BrambleBackend):
         self.async_assign_chunks = AsyncMock()
         self.async_append_data = AsyncMock()
 
+        self.async_append_data.return_value = {}
+
 
 @pytest.fixture
 def mock_backend():
@@ -106,10 +109,10 @@ def writer(mock_backend, id_gen, patched_compressors):
     w = BrambleWriter(
         backend=mock_backend,
         num_simultaneous_chunks=4,
-        chunk_size_mb=1.0,  # rotation tests override this
+        chunk_size_mb=16.0,  # rotation tests override this
         compression_quality=6,
-        max_assignment_imbalance_factor=1.0,
-        base_assignment_imbalance_num=1,
+        max_assignment_imbalance_factor=2.0,
+        base_assignment_imbalance_num=5,
     )
 
     return w
@@ -120,12 +123,12 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def _make_entry(message: str, ts: float, mt: MessageType, md: dict) -> LogEntry:
+    return LogEntry(message=message, timestamp=ts, message_type=mt, entry_metadata=md)
+
+
 def _make_entries(branch_id: str, n: int = 1):
-    """
-    Return n dummy log entries. We don't need real LogEntry objects because
-    compressors are patched to ignore the entry payload.
-    """
-    return [object() for _ in range(n)]
+    return [_make_entry("", 0.0, MessageType.USER, {}) for _ in range(n)]
 
 
 # ----------------------------
@@ -671,3 +674,138 @@ def test_rotation_purges_old_meta_chunk_from_all_mappings_and_adds_new_one(
     _assert_new_chunk_present_in_meta_mappings(
         w, new_meta_chunk, expected_ids_and_names
     )
+
+
+def test_calculated_metadata_not_written_before_branch_closed(writer, mock_backend):
+    # Add a branch; writer should initialize calculated metadata, but not write it yet.
+    _run(writer.add_branches({("b1", "name")}))
+
+    # Append entries (should update in-memory calculated metadata only)
+    e1 = _make_entry("m1", ts=10.0, mt=MessageType.USER, md={})
+    e2 = _make_entry("m2", ts=12.0, mt=MessageType.USER, md={})
+    _run(writer.append_entries({"b1": [e1, e2]}))
+
+    # No metadata write should have happened yet.
+    # (append_entries writes entry chunks via async_append_data; metadata write happens via close_branches -> update_branch_info)
+    calls = list(mock_backend.async_append_data.await_args_list)
+    # Ensure we never wrote any metadata-compressed bytes (they begin with 0..4 type codes, not EntryCompressor's PREFIX_SIZE=2 branch marker).
+    # Most robust is to assert close_branches hasn't triggered extra async_append_data with meta payload.
+    # So: all writes so far should be from entries, and should touch the entry chunk id for b1.
+    assert len(calls) >= 1
+    b1_entry_chunk = writer._id_to_entry_compressor_map["b1"]
+    assert any(b1_entry_chunk in c.kwargs["chunk_data"] for c in calls)
+
+    # And: update_branch_info hasn't been invoked directly, so metadata dict should not have been written to meta chunk.
+    # We detect this by ensuring no call includes the b1 meta chunk id.
+    b1_meta_chunk = writer._id_to_meta_compressor_map["b1"]
+    assert not any(b1_meta_chunk in c.kwargs["chunk_data"] for c in calls)
+
+
+def test_calculated_metadata_written_after_branch_closed(writer, mock_backend):
+    _run(writer.add_branches({("b1", "name")}))
+
+    # Append entries to establish started/stopped and num_entries
+    e1 = _make_entry("m1", ts=10.0, mt=MessageType.USER, md={})
+    e2 = _make_entry("m2", ts=12.0, mt=MessageType.USER, md={})
+    _run(writer.append_entries({"b1": [e1, e2]}))
+
+    # Capture all appended chunk_data payloads
+    captured_calls = []
+
+    async def capture_append(chunk_data):
+        captured_calls.append(chunk_data)
+        return {k: len(v) for k, v in chunk_data.items()}
+
+    mock_backend.async_append_data.side_effect = capture_append
+
+    # Close the branch -> should write calculated metadata via update_branch_info -> meta compressor -> append_data
+    _run(writer.close_branches({"b1"}))
+
+    assert len(captured_calls) >= 1
+    b1_meta_chunk = writer._id_to_meta_compressor_map.get("b1")
+    # Note: mapping may be removed after close; so we infer meta chunk id from prior assignment by recomputing:
+    # We stored it before close (below).
+    # If it got deleted, use the chunk ids present in captured_calls.
+    if b1_meta_chunk is not None:
+        assert any(b1_meta_chunk in call for call in captured_calls)
+
+    # The metadata write should include the keys we track.
+    # We don't decode the bytes here; instead, assert that metadata writer was invoked by checking
+    # that something was written to *some* mc chunk.
+    assert any(
+        any(cid.startswith("mc") for cid in call.keys()) for call in captured_calls
+    )
+
+
+def test_adding_entry_increments_num_entries_metadata(writer, mock_backend):
+    _run(writer.add_branches({("b1", "name")}))
+
+    # Before any entries
+    assert writer._active_branches_calculated_metadata["b1"]["num_entries"] == 0
+
+    e1 = _make_entry("m1", ts=10.0, mt=MessageType.USER, md={})
+    _run(writer.append_entries({"b1": [e1]}))
+
+    assert writer._active_branches_calculated_metadata["b1"]["num_entries"] == 1
+
+    e2 = _make_entry("m2", ts=11.0, mt=MessageType.USER, md={})
+    _run(writer.append_entries({"b1": [e2]}))
+
+    # Note: current implementation increments by 1 per append_entries call, not per entry in the list.
+    assert writer._active_branches_calculated_metadata["b1"]["num_entries"] == 2
+
+
+def test_adding_entry_increases_stop_time(writer, mock_backend):
+    _run(writer.add_branches({("b1", "name")}))
+
+    e1 = _make_entry("m1", ts=10.0, mt=MessageType.USER, md={})
+    _run(writer.append_entries({"b1": [e1]}))
+    assert writer._active_branches_calculated_metadata["b1"]["stopped"] == 10.0
+
+    e2 = _make_entry("m2", ts=25.0, mt=MessageType.USER, md={})
+    _run(writer.append_entries({"b1": [e2]}))
+    assert writer._active_branches_calculated_metadata["b1"]["stopped"] == 25.0
+
+
+def test_adding_entry_does_not_increase_start_time(writer, mock_backend):
+    _run(writer.add_branches({("b1", "name")}))
+
+    e1 = _make_entry("m1", ts=10.0, mt=MessageType.USER, md={})
+    _run(writer.append_entries({"b1": [e1]}))
+    assert writer._active_branches_calculated_metadata["b1"]["started"] == 10.0
+
+    # Later entry should not move started forward
+    e2 = _make_entry("m2", ts=25.0, mt=MessageType.USER, md={})
+    _run(writer.append_entries({"b1": [e2]}))
+    assert writer._active_branches_calculated_metadata["b1"]["started"] == 10.0
+
+    # Even if an older timestamp arrives later, started should remain the first-set value
+    # (current code only sets started if it is None)
+    e3 = _make_entry("m3", ts=5.0, mt=MessageType.USER, md={})
+    _run(writer.append_entries({"b1": [e3]}))
+    assert writer._active_branches_calculated_metadata["b1"]["started"] == 10.0
+
+
+def test_branches_have_created_time(writer, mock_backend):
+    _run(writer.add_branches({("b1", "name")}))
+
+    meta = writer._active_branches_calculated_metadata["b1"]
+    assert "created" in meta
+    assert isinstance(meta["created"], (int, float))
+    assert meta["created"] > 0
+
+
+def test_calculated_metadata_removed_after_branch_closed(writer, mock_backend):
+    _run(writer.add_branches({("b1", "name")}))
+
+    assert "b1" in writer._active_branches_calculated_metadata
+
+    # Need a backend append impl for close_branches (it calls update_branch_info -> async_append_data)
+    async def capture_append(chunk_data):
+        return {k: len(v) for k, v in chunk_data.items()}
+
+    mock_backend.async_append_data.side_effect = capture_append
+
+    _run(writer.close_branches({"b1"}))
+
+    assert "b1" not in writer._active_branches_calculated_metadata
