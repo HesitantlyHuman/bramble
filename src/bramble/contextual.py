@@ -1,26 +1,29 @@
-from typing import Dict, List, ContextManager
+from typing import ContextManager, Dict, List, Set
 
 from contextlib import contextmanager, nullcontext
 
-from bramble.utils import (
-    _validate_log_call,
-    _validate_tags_and_metadata,
-)
 from bramble.log_objects import MessageType
+from bramble.utils import (
+    _validate_tags_and_metadata,
+    _get_location_info,
+    _validate_log_call,
+)
 from bramble.loggers import (
     _CURRENT_BRANCH_IDS,
     _LIVE_BRANCHES,
     _ENABLED,
-    LogBranch,
     _LoggingContext,
+    LogBranch,
 )
 
 
-# TODO: Change log to use context to load the branches, so that context is the only function that deals directly in _CURRENT_BRANCH_IDS (check that this is the case, and verify that this change wont break anything)
+# TODO: Update documentation
 def log(
     message: str,
     message_type: MessageType | str = MessageType.USER,
     entry_metadata: Dict[str, str | int | float | bool] | None = None,
+    log_code_location: bool = True,
+    code_location_context_size: int = 5,
 ):
     """Log a message to the active `bramble` branches.
 
@@ -54,17 +57,23 @@ def log(
         entry_metadata=entry_metadata,
     )
 
+    if log_code_location:
+        if entry_metadata is None:
+            entry_metadata = {}
+        entry_metadata.update(_get_location_info(2, context=code_location_context_size))
+
     for branch in context():
         branch.log(
             message=message,
             message_type=message_type,
             entry_metadata=entry_metadata,
+            log_code_location=False,
         )
 
 
 def _set_tags_and_metadata(
     branches: List[LogBranch],
-    tags: List[str] | None = None,
+    tags: Set[str] | None = None,
     metadata: Dict[str, str | int | float | bool] | None = None,
 ) -> None:
     for branch in branches:
@@ -75,9 +84,10 @@ def _set_tags_and_metadata(
             branch.add_metadata(metadata)
 
 
+# TODO: Update documentation
 def apply(
     *args,
-    tags: List[str] | None = None,
+    tags: List[str] | Set[str] | None = None,
     metadata: Dict[str, str | int | float | bool] | None = None,
 ):
     """Add tags or metadata to active `bramble` branches.
@@ -156,7 +166,6 @@ def context(*args: List[LogBranch] | None) -> List[LogBranch]:
 
             current_branch_ids = _CURRENT_BRANCH_IDS.get()
             for id in current_branch_ids:
-                # TODO: What should we do if this fails?
                 branches.append(_LIVE_BRANCHES[id])
 
             return branches
@@ -191,9 +200,10 @@ def context(*args: List[LogBranch] | None) -> List[LogBranch]:
     return _LoggingContext(parameter)
 
 
+# TODO: Update documentation
 def fork(
     name: str,
-    tags: List[str] | None = None,
+    tags: List[str] | Set[str] | None = None,
     metadata: Dict[str, str | int | float | bool] | None = None,
 ) -> ContextManager[None]:
     """Will fork the current `bramble` context.

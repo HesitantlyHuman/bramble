@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Set
 
 import os
 import uuid
@@ -8,10 +8,12 @@ import traceback
 from bramble.log_objects import MessageType
 
 
-# TODO: Add location info option for logging
+# TODO: document that setting context to 0 or below will disable the line output
 def _get_location_info(
     stack_offset: int, context: int = 5
 ) -> Dict[str, int | str] | None:
+    if context is None or context < 0:
+        context = 0
     current_frame = inspect.currentframe()
 
     for _ in range(stack_offset):
@@ -20,12 +22,15 @@ def _get_location_info(
             return None
 
     info = inspect.getframeinfo(current_frame, context=context)
-    return {
+    location_info = {
         "file": os.path.basename(info.filename),
         "line": info.lineno,
         "function": info.function,
-        "context": "".join(info.code_context),
     }
+    if context > 0:
+        location_info.update({"context": "".join(info.code_context)})
+
+    return location_info
 
 
 def _generate_id(prefix: str = None) -> str:
@@ -99,16 +104,20 @@ def _validate_log_call(
 
 
 def _validate_tags_and_metadata(
-    *args, tags: List[str] | None, metadata: Dict[str, str | int | float | bool] | None
-) -> Tuple[List[str] | None, Dict[str, str | int | float | bool] | None]:
+    *args,
+    tags: List[str] | Set[str] | None,
+    metadata: Dict[str, str | int | float | bool] | None,
+) -> Tuple[Set[str] | None, Dict[str, str | int | float | bool] | None]:
     """Validates a bramble tags and metadata for functional API.
 
     Used to ensure that we have consistent validation that happens as close to
     the user as possible.
     """
     if tags is not None:
-        if not isinstance(tags, list):
-            raise ValueError(f"`tags` must be of type `list`, received {type(tags)}.")
+        if not isinstance(tags, (list, set)):
+            raise ValueError(
+                f"`tags` must be of type `list` or `set`, received {type(tags)}."
+            )
         args = (*args, tags)
 
     if metadata is not None:
@@ -123,10 +132,10 @@ def _validate_tags_and_metadata(
     collected_tags = set()
 
     for arg in args:
-        if isinstance(arg, list):
+        if isinstance(arg, (list, set)):
             if not all([isinstance(element, str) for element in arg]):
                 raise ValueError(
-                    f"Tag `list` arguments must be a list of string tags, received {arg}"
+                    f"Tag `list` or `set` arguments must be a list of string tags, received {arg}"
                 )
             collected_tags.update(arg)
         elif isinstance(arg, dict):
@@ -142,13 +151,11 @@ def _validate_tags_and_metadata(
             collected_metadata.update(arg)
         else:
             raise ValueError(
-                f"Arguments must be of type `list` or `dict`, received {type(arg)}"
+                f"Arguments must be of type `list`, `set` or `dict`, received {type(arg)}"
             )
 
     if len(collected_tags) == 0:
         collected_tags = None
-    else:
-        collected_tags = list(collected_tags)
 
     if len(collected_metadata) == 0:
         collected_metadata = None

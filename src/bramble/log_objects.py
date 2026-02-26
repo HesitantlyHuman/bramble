@@ -1,3 +1,4 @@
+# TODO: Organize imports
 from typing import Dict, List, Self, Any
 
 from dataclasses import dataclass, asdict
@@ -54,6 +55,7 @@ class LogEntry:
 
 
 # TODO: should we be using this where I have `branch_info` things?
+# TODO: change this to use a set representation of tags and children
 @dataclass(frozen=True, slots=True)
 class BranchData:
     """A tree logger branch's full info."""

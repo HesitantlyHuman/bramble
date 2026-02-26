@@ -1,3 +1,4 @@
+# TODO: Organize imports
 from typing import Any, Set, Self, Tuple, Generator, Dict, List
 
 from dataclasses import dataclass
@@ -28,7 +29,6 @@ def _pack_compress_flush(compressor: Any, input: Any) -> bytes:
     return data
 
 
-# TODO: we may want to rename this, since we have something else named writer
 @dataclass
 class BrambleCompressor:
     compressor: Any
@@ -80,8 +80,8 @@ class MetadataCompressor(BrambleCompressor):
         self,
         branch_id: str,
         parent: str = None,
-        children: List[str] = None,
-        tags: List[str] = None,
+        children: Set[str] = None,
+        tags: Set[str] = None,
         metadata: Dict[str, str | int | float | bool] = None,
     ) -> bytes:
         data = b""
@@ -96,12 +96,10 @@ class MetadataCompressor(BrambleCompressor):
             data += _pack_compress_flush(self.compressor, parent)
 
         if children is not None and len(children) > 0:
-            children = list(set(children))
             data += (2).to_bytes(1, "big")
             data += _pack_compress_flush(self.compressor, children)
 
         if tags is not None and len(tags) > 0:
-            tags = list(set(tags))
             data += (3).to_bytes(1, "big")
             data += _pack_compress_flush(self.compressor, tags)
 
@@ -280,6 +278,3 @@ class EntryDecompressor(BrambleDecompressor):
         while next_item is not None:
             yield next_item
             next_item = self.read_next()
-
-
-# TODO: Change all internal representations of children and tags to be sets. Keep external interfaces using lists, for simplicity.

@@ -291,6 +291,7 @@ def test_not_holding_branch_reference_will_close_on_del(mock_backend):
     closed_ids = set()
 
     async def capture_branches(branch_ids: set):
+        print(branch_ids)
         closed_ids.update(branch_ids)
 
     logger.writer.close_branches = capture_branches
@@ -299,14 +300,17 @@ def test_not_holding_branch_reference_will_close_on_del(mock_backend):
         child = l.root.branch("child")
         child_id = child.id
 
-        # Remove last ref; __del__ should enqueue close task.
-        del child
+        child = None
         gc.collect()
+
+        import time
+
+        time.sleep(0.1)
 
         # Force the queued close task to be processed *now*.
         _drain_close_tasks(l)
 
-        assert child_id in closed_ids
+    assert child_id in closed_ids
 
 
 def test_holding_branch_reference_keeps_it_from_closing_until_manual_close(

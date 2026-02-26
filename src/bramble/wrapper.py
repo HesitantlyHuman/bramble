@@ -1,4 +1,5 @@
-from typing import Dict, List, Callable, Any, Awaitable
+# TODO: Organize imports
+from typing import Dict, List, Callable, Any, Awaitable, Set
 
 import functools
 import inspect
@@ -77,10 +78,11 @@ def _sync_branch(func, tags=None, metadata=None):
     return wrapper
 
 
+# TODO: update documentation
 def branch(
     _func=None,
     *args,
-    tags: List[str] | None = None,
+    tags: List[str] | Set[str] | None = None,
     metadata: Dict[str, str | int | float | bool] | None = None,
 ) -> Callable[..., Any | Awaitable[Any]]:
     """Mark a function for branching.

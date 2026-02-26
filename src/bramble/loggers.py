@@ -1,5 +1,4 @@
-# TODO: Alphabetize and order imports
-from typing import Set, Dict, List, Any, Tuple, Self
+from typing import Any, Dict, List, Self, Set, Tuple
 
 import contextvars
 import threading
@@ -8,7 +7,7 @@ import asyncio
 import queue
 import time
 
-from bramble.utils import _validate_log_call, _generate_id
+from bramble.utils import _generate_id, _get_location_info, _validate_log_call
 from bramble.backends.base import BrambleBackend
 from bramble.writer import BrambleWriter
 from bramble.stdlib import hook_logging
@@ -55,7 +54,20 @@ class TreeLogger:
         if not isinstance(name, str):
             raise ValueError(f"`name` must be of type `str`, received {type(name)}.")
 
-        # TODO: validate other input types?
+        if not isinstance(batch_size, (int, float)):
+            raise ValueError(
+                f"`batch_size` must be of type `int`, received {type(batch_size)}"
+            )
+
+        if not isinstance(debounce, (int, float)):
+            raise ValueError(
+                f"`debounce` must be of type `float`, received {type(debounce)}"
+            )
+
+        if not isinstance(silent, bool):
+            raise ValueError(
+                f"`silent` must be of type `bool`, received {type(silent)}"
+            )
 
         self.writer = writer
         self.silent = silent
@@ -234,12 +246,15 @@ class TreeLogger:
             if not self.silent:
                 raise e
 
+    # TODO: update documentation
     def log(
         self,
         branch_id: str,
         message: str | Exception,
         message_type: MessageType | str = MessageType.USER,
         entry_metadata: Dict[str, str | int | float | bool] | None = None,
+        log_code_location: bool = True,
+        code_location_context_size: int = 5,
     ) -> None:
         """Log a message to the tree logger.
 
@@ -268,6 +283,13 @@ class TreeLogger:
 
         if not _ENABLED.get():
             return
+
+        if log_code_location:
+            if entry_metadata is None:
+                entry_metadata = {}
+            entry_metadata.update(
+                _get_location_info(2, context=code_location_context_size)
+            )
 
         timestamp = datetime.datetime.now().timestamp()
         log_entry = LogEntry(
@@ -354,7 +376,7 @@ class LogBranch:
     tags: Set[str]
     metadata: Dict[str, str | int | float | bool]
 
-    slots = (
+    __slots__ = (
         "id",
         "name",
         "parent",
@@ -362,6 +384,8 @@ class LogBranch:
         "tags",
         "metadata",
         "tree_logger",
+        "_closed",
+        "_logging_context",
     )
 
     def __init__(self, name: str, tree_logger: TreeLogger, id: str = None):
@@ -380,11 +404,14 @@ class LogBranch:
         self.tree_logger._update_metadata(self.id, self.metadata)
         self.tree_logger._create_branch(self.id, self.name)
 
+    # TODO: update documentation
     def log(
         self,
         message: str | Exception,
         message_type: MessageType | str = MessageType.USER,
         entry_metadata: Dict[str, str | int | float | bool] = None,
+        log_code_location: bool = True,
+        code_location_context_size: int = 5,
     ):
         """Log a message to the tree logger.
 
@@ -398,11 +425,20 @@ class LogBranch:
         """
         if self._closed:
             raise ValueError(f"Cannot write to a closed bramble LogBranch!")
+
+        if log_code_location:
+            if entry_metadata is None:
+                entry_metadata = {}
+            entry_metadata.update(
+                _get_location_info(2, context=code_location_context_size)
+            )
+
         self.tree_logger.log(
             self.id,
             message=message,
             message_type=message_type,
             entry_metadata=entry_metadata,
+            log_code_location=False,
         )
 
     def branch(self, name: str) -> "LogBranch":
@@ -454,14 +490,18 @@ class LogBranch:
         self.parent = parent_id
         self.tree_logger._update_tree(self.id, self.parent, self.children)
 
-    def add_tags(self, tags: List[str]) -> None:
-        if not isinstance(tags, list):
-            raise ValueError(f"`tags` must be of type `list`, received {type(tags)}.")
+    # TODO: maybe we shouldn't send all of the tags, just the new ones
+    def add_tags(self, tags: List[str] | Set[str]) -> None:
+        if not isinstance(tags, (list, set)):
+            raise ValueError(
+                f"`tags` must be of type `list` or `set`, received {type(tags)}."
+            )
         for tag in tags:
             if not isinstance(tag, str):
                 raise ValueError(
                     f"Each entry of `tags` must be of type `str`, received {type(tag)}."
                 )
+        tags = set(tags)
         self.tags.update(tags)
         self.tree_logger._update_tags(self.id, self.tags)
 
@@ -482,8 +522,13 @@ class LogBranch:
         self.metadata.update(metadata)
         self.tree_logger._update_metadata(self.id, self.metadata)
 
-    # TODO: document function
     def close(self) -> None:
+        """Close the log branch.
+
+        Close this branch. This will remove this branch and its id from the
+        writer, freeing up the current logging chunk. Once a branch is closed,
+        it can never be written to again.
+        """
         self._closed = True
         self.tree_logger._close_branch(self.id)
 
@@ -518,7 +563,6 @@ class LogBranch:
             pass
 
 
-# TODO: Add pytesting for the closing functionality
 class _LoggingContext:
     _prev_logger_ids: Set[str]
     _new_branches: List[LogBranch]

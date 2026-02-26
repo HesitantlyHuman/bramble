@@ -1,12 +1,12 @@
-from typing import Dict, List, Tuple, Set, Any, Iterable, Callable
+from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
 
-import asyncio
 import datetime
+import asyncio
 
-from bramble.utils import _generate_id
-from bramble.log_objects import LogEntry
+from bramble.compression import BrambleCompressor, EntryCompressor, MetadataCompressor
 from bramble.backends.base import BrambleBackend
-from bramble.compression import EntryCompressor, MetadataCompressor, BrambleCompressor
+from bramble.log_objects import LogEntry
+from bramble.utils import _generate_id
 
 
 # TODO: Add support for loading the active chunks

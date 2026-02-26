@@ -73,7 +73,7 @@ def test_log_adds_entry_to_active_branch(mock_backend):
     mock_backend.append_entries.side_effect = capture_entries
 
     with TreeLogger(writer=mock_backend) as logger:
-        log("hello world", MessageType.USER, {"info": 1})
+        log("hello world", MessageType.USER, {"info": 1}, log_code_location=False)
 
     # Ensure one branch got one log entry
     assert len(captured_entries) == 1
