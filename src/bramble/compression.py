@@ -12,6 +12,7 @@ from bramble.backends.base import ByteSource, as_byte_source
 PREFIX_SIZE: int = 2
 
 # TODO: test the compression ratio of various chunk sizes, as well as read and write speeds
+# TODO: maybe implement zstandard and test if it has better compression and speeds
 
 
 def _pack_compress_flush(compressor: Any, input: Any) -> bytes:
