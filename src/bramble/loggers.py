@@ -43,7 +43,7 @@ class TreeLogger:
         writer: BrambleWriter,
         name: str = "root",
         debounce: float = 0.25,
-        batch_size: int = 50,
+        batch_size: int = 500,
         silent: bool = False,
     ):
         if not isinstance(writer, BrambleWriter):
@@ -86,7 +86,7 @@ class TreeLogger:
         backend: BrambleBackend,
         name: str = "root",
         debounce: float = 0.25,
-        batch_size: int = 50,
+        batch_size: int = 500,
         silent: bool = False,
         num_simultaneous_chunks: int = 32,
         chunk_size_mb: int = 16,
@@ -112,6 +112,7 @@ class TreeLogger:
 
     def run(self):
         async def _run():
+            num_tasks = 0
             logging_tasks: Dict[str, List[LogEntry]] = None
             metadata_tasks: Dict[str, Dict[str, Any]] = None
             branch_creation_tasks: Set[Tuple[str, str]] = None
@@ -119,32 +120,18 @@ class TreeLogger:
 
             deadline = None
 
-            def get_batch_size():
-                return max(
-                    [0]
-                    + [
-                        len(item)
-                        for item in [
-                            logging_tasks,
-                            metadata_tasks,
-                            branch_creation_tasks,
-                            branch_closing_tasks,
-                        ]
-                        if item is not None
-                    ]
-                )
-
             while True:
                 if deadline:
                     try:
                         task = self._tasks.get(timeout=deadline - time.time())
                     except queue.Empty:
-                        task = ()
+                        task = ()  # Nothing for now
                 else:
                     task = self._tasks.get()
                     deadline = time.time() + self._debounce
 
                 if task is not None and len(task) > 0:
+                    num_tasks += 1
                     match task[0]:
                         case 0:
                             _, branch_id, log_entry = task
@@ -198,7 +185,7 @@ class TreeLogger:
 
                 if (
                     time.time() > deadline
-                    or get_batch_size() >= self._batch_size
+                    or num_tasks >= self._batch_size
                     or task is None
                 ):
                     if branch_creation_tasks:
@@ -228,12 +215,13 @@ class TreeLogger:
                     if branch_closing_tasks:
                         await self.writer.close_branches(branch_closing_tasks)
 
-                    logging_tasks, metadata_tasks, branch_creation_tasks = (
-                        None,
-                        None,
-                        None,
-                    )
-
+                    (
+                        logging_tasks,
+                        metadata_tasks,
+                        branch_creation_tasks,
+                        branch_closing_tasks,
+                    ) = (None, None, None, None)
+                    num_tasks = 0
                     deadline = None
 
                 if task is None:
@@ -401,8 +389,8 @@ class LogBranch:
         self.id = id
 
         self._closed = False
-        self.tree_logger._update_metadata(self.id, self.metadata)
         self.tree_logger._create_branch(self.id, self.name)
+        self.tree_logger._update_metadata(self.id, self.metadata)
 
     # TODO: update documentation
     def log(

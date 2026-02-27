@@ -27,7 +27,6 @@ class MemoryBackend(BrambleBackend):
         return new_sizes
 
     def assign_chunks(self, branch_chunks, chunk_type):
-        print(branch_chunks, chunk_type)
         for branch_id, chunks_to_assign in branch_chunks.items():
             self.branch_ids_to_chunks.setdefault(chunk_type, {}).setdefault(
                 branch_id, set()

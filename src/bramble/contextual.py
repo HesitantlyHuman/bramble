@@ -57,12 +57,16 @@ def log(
         entry_metadata=entry_metadata,
     )
 
+    branches = context()
+    if len(branches) == 0:
+        return
+
     if log_code_location:
         if entry_metadata is None:
             entry_metadata = {}
         entry_metadata.update(_get_location_info(2, context=code_location_context_size))
 
-    for branch in context():
+    for branch in branches:
         branch.log(
             message=message,
             message_type=message_type,
