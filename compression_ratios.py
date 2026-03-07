@@ -199,10 +199,10 @@ def calculate_raw_metadata_bytes(
 def run_test(
     num_simultaneous_chunks: int = 32,
     chunk_size_mb: float = 16.0,
-    compression_quality: int = 11,
+    compression_quality: int = 6,
     max_assignment_imbalance_factor: float = 3.0,
     base_assignment_imbalance_num: int = 10,
-    max_depth: int = 6,
+    max_depth: int = 5,
     max_branch: int = 10,
     avg_branch: int = 2,
     weights: Dict[str, float] = {"simple": 1.0},

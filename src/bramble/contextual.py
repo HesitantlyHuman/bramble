@@ -57,6 +57,9 @@ def log(
         entry_metadata=entry_metadata,
     )
 
+    if not _ENABLED.get():
+        return
+
     branches = context()
     if len(branches) == 0:
         return
@@ -67,11 +70,15 @@ def log(
         entry_metadata.update(_get_location_info(2, context=code_location_context_size))
 
     for branch in branches:
-        branch.log(
+        if branch._closed:
+            raise ValueError("Cannot write to a closed bramble LogBranch!")
+
+        # Since we have already done the necessary checks, bypass them
+        branch.tree_logger._add_log_item(
+            branch_id=branch.id,
             message=message,
             message_type=message_type,
             entry_metadata=entry_metadata,
-            log_code_location=False,
         )
 
 

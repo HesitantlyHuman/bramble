@@ -121,6 +121,10 @@ class TreeLogger:
             deadline = None
 
             while True:
+                # TODO: Need to add backpressure
+                # TODO: will not interrupt the thread until queue is empty, because
+                # the `None` signal is put behind all of the tasks. We should not do this.
+                print(self._tasks.qsize())
                 if deadline:
                     try:
                         task = self._tasks.get(timeout=deadline - time.time())
@@ -263,6 +267,7 @@ class TreeLogger:
                 strings, or the values of `entry_metadata` are not `str`, `int`,
                 `float`, or `bool`.
         """
+        # TODO: unable to verify that we are not writing to a closed branch
         message, message_type, entry_metadata = _validate_log_call(
             message=message,
             message_type=message_type,
@@ -279,6 +284,20 @@ class TreeLogger:
                 _get_location_info(2, context=code_location_context_size)
             )
 
+        self._add_log_item(
+            branch_id=branch_id,
+            message=message,
+            message_type=message_type,
+            entry_metadata=entry_metadata,
+        )
+
+    def _add_log_item(
+        self,
+        branch_id: str,
+        message: str | Exception,
+        message_type: MessageType | str = MessageType.USER,
+        entry_metadata: Dict[str, str | int | float | bool] | None = None,
+    ) -> None:
         timestamp = datetime.datetime.now().timestamp()
         log_entry = LogEntry(
             message=message,
@@ -411,8 +430,17 @@ class LogBranch:
             entry_metadata (Dict[str, Union[str, int, float, bool]], optional): Metadata
                 to include with the log entry. Defaults to None.
         """
+        message, message_type, entry_metadata = _validate_log_call(
+            message=message,
+            message_type=message_type,
+            entry_metadata=entry_metadata,
+        )
+
+        if not _ENABLED.get():
+            return
+
         if self._closed:
-            raise ValueError(f"Cannot write to a closed bramble LogBranch!")
+            raise ValueError("Cannot write to a closed bramble LogBranch!")
 
         if log_code_location:
             if entry_metadata is None:
@@ -421,12 +449,12 @@ class LogBranch:
                 _get_location_info(2, context=code_location_context_size)
             )
 
-        self.tree_logger.log(
-            self.id,
+        # Since we have already done the necessary checks, bypass them
+        self.tree_logger._add_log_item(
+            branch_id=self.id,
             message=message,
             message_type=message_type,
             entry_metadata=entry_metadata,
-            log_code_location=False,
         )
 
     def branch(self, name: str) -> "LogBranch":
