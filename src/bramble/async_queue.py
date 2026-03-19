@@ -7,6 +7,10 @@ import time
 T = TypeVar("T")
 
 
+def active_tasks() -> int:
+    return len([task for task in asyncio.all_tasks() if not task.done()])
+
+
 class BatchingQueue(Generic[T]):  # TODO: come up w better name
     batch_size: int
     debounce: float
@@ -97,7 +101,8 @@ class BatchingQueue(Generic[T]):  # TODO: come up w better name
             await _output_batch()
 
     async def output_batch(self, batch: List[T]):
-        print(f"({time.monotonic()}) Outputting batch of size {len(batch)}")
+        # print(f"({time.monotonic()}) Outputting batch of size {len(batch)}")
+        await asyncio.sleep(0.1)
 
 
 if __name__ == "__main__":
@@ -108,9 +113,12 @@ if __name__ == "__main__":
     async def main():
         # for i in range(100):
         #     await my_queue.async_add(i)
+        start = time.time()
         tasks = []
-        for i in range(100_000):
+        for i in range(100_003):
             tasks.append(my_queue.async_add(i))
         await asyncio.gather(*tasks)
+        end = time.time()
+        print(end - start)
 
     asyncio.run(main())
